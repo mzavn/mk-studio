@@ -8,9 +8,7 @@ Mỗi bản có số dạng `X.Y.Z` (chung cho cả bộ skill):
 
 Cập nhật: `bash ~/.mk-studio/install.sh --update`.
 
-## Chưa phát hành
-
-Dự kiến: v0.1.0
+## v0.1.0 — 20/10/2026
 
 ### mk-star
 
