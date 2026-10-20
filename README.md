@@ -13,11 +13,9 @@ Bộ skill kỹ thuật & lập trình đi kèm là **[mk-lab](https://github.co
 | **`mk-star`** | `/mk:star` | *"viết nhật ký ngày"*, *"giải quyết vấn đề"*, *"luyện case 05"* | Hệ nhật ký STAR 5 loại: biến cảm xúc/vấn đề/thành công thành quyết định, kế hoạch và tài sản đóng gói. Lưu hoàn toàn ở máy cá nhân (`~/nhat-ky-star/`). |
 | **`mk-exec-review`** | `/mk:exec-review <file>` | *"phản biện bài <đường dẫn>"*, *"đọc bài như CEO"*, *"soát bài"* | Hội đồng C-level (CEO, CFO, CMO, COO, CTO) phản biện bài viết theo chân dung khách hàng thật, bóc giọng văn AI, chuẩn hóa thuật ngữ, tối ưu SEO/GEO/AEO, duyệt từng mã gợi ý trước khi sửa. |
 
-> **Quy ước tên gọi (`mk:`):**
-> - Tương tự bộ `ak`, các skill trong bộ dùng tiền tố `mk:` trong frontmatter để gọi nhanh dạng slash command: `/mk:star`, `/mk:exec-review`.
-> - Thư mục cài đặt và cờ `--skill` dùng tên gạch nối: `mk-star`, `mk-exec-review`.
-> - Tiền tố `mk:` là quy ước định danh của bộ skill này, **không** phải plugin Claude Code tên `mk`. Nếu bạn cấu hình quyền trong `settings.json`, hãy dùng tên mới: `Skill(mk:star)` hoặc `Skill(mk:exec-review)`.
-
+> **Lưu ý tên lệnh và quyền:**
+> - Gọi nhanh qua slash command: `/mk:star`, `/mk:exec-review`. Thư mục cài đặt và cờ `--skill` dùng tên gạch nối: `mk-star`, `mk-exec-review`.
+> - Tiền tố `mk:` là quy ước định danh riêng của bộ skill này, **không** phải plugin Claude Code tên `mk`. Nếu bạn cấu hình quyền trong `settings.json`, hãy khai báo theo tên skill: `Skill(mk:star)` hoặc `Skill(mk:exec-review)`.
 ---
 
 ## 1. mk:star — Hệ nhật ký STAR (5 loại)
@@ -182,15 +180,7 @@ Dự án phát triển trên nhánh `dev` (`main` chỉ chứa các bản phát 
 
    # Kiểm tra cú pháp shell
    bash -n install.sh && /bin/bash -n install.sh
-
-   # Kiểm tra độ đầy đủ dữ liệu STAR (phải 0 thiếu)
-   python3 plans/tools/star_fidelity.py plans/sources/he-nhat-ky-star.xlsx skills/mk-star
-
-   # Kiểm tra tính hợp lệ của frontmatter và cấu trúc skill
-   python3 ~/.agents/skills/ak-skill-creator/scripts/quick_validate.py skills/mk-star && \
-   python3 ~/.agents/skills/ak-skill-creator/scripts/quick_validate.py skills/mk-exec-review
    ```
-
 ---
 
 ## Ghi công
