@@ -1,4 +1,4 @@
-# Cài mk-studio (skill star)
+# Cài mk-studio (skill mk:star)
 
 Hướng dẫn ngắn cho cả người và agent. Repo đang **private**: cần tài khoản GitHub có quyền đọc `mzavn/mk-studio`.
 
@@ -12,12 +12,12 @@ Hướng dẫn ngắn cho cả người và agent. Repo đang **private**: cần
 
 2. **Đã cài chưa?**
    ```bash
-   grep -m1 -H 'version:' ~/.claude/skills/star/SKILL.md ~/.agents/skills/star/SKILL.md 2>/dev/null
-   cat ~/.claude/skills/star/.mk-studio-source 2>/dev/null
+   grep -m1 -H 'version:' ~/.claude/skills/mk-star/SKILL.md ~/.agents/skills/mk-star/SKILL.md 2>/dev/null
+   cat ~/.claude/skills/mk-star/.mk-studio-source 2>/dev/null
    ```
-   Có `.mk-studio-source` → bước 3 dùng `bash <đường dẫn đó>/install.sh --update`.
+   Có `.mk-studio-source` → kiểm đường dẫn trong đó trước khi chạy gì: `git -C <đường dẫn đó> remote get-url origin` phải trỏ về `mzavn/mk-studio` và có file `<đường dẫn đó>/skills/mk-star/SKILL.md`. Đạt → bước 3 dùng `bash <đường dẫn đó>/install.sh --update`; không đạt → báo người dùng, dùng `~/.mk-studio`.
 
-3. **Cài chung cho máy** (`~/.claude/skills/star` và `~/.agents/skills/star`):
+3. **Cài chung cho máy** (`~/.claude/skills/mk-star` và `~/.agents/skills/mk-star`):
    ```bash
    gh repo clone mzavn/mk-studio ~/.mk-studio && bash ~/.mk-studio/install.sh --global
    ```
@@ -25,7 +25,7 @@ Hướng dẫn ngắn cho cả người và agent. Repo đang **private**: cần
 
 4. **Kiểm kết quả** — chạy lại lệnh ở bước 2: hai bản cùng phiên bản.
 
-5. **Báo người dùng**: phiên bản đã cài; bài nhật ký lưu ở `~/nhat-ky-star/`, không cài vào repo, không cần `AGENTS.md`. Câu để bắt đầu: "viết nhật ký ngày".
+5. **Báo người dùng**: phiên bản đã cài; bài nhật ký lưu ở `~/nhat-ky-star/`, không cài vào repo, không cần `AGENTS.md`. Câu để bắt đầu: gõ `/mk:star` hoặc nói "viết nhật ký ngày".
 
 ## Cập nhật
 
@@ -41,11 +41,12 @@ bash ~/.mk-studio/install.sh --update --global --project .   # đứng trong rep
 | Thông báo | Làm gì |
 |---|---|
 | `Could not resolve to a Repository` / `cannot clone` | Tài khoản `gh` chưa có quyền repo private → người dùng xin quyền chủ repo, hoặc `gh auth login` đúng tài khoản |
-| `was not installed by install.sh` | Đã có thư mục skill cùng tên (vd `~/.claude/skills/star`) không do installer tạo — có thể là skill khác. Hỏi người dùng; giữ thì đổi tên thư mục đó, bỏ thì chạy lại với `--force` |
+| `was not installed by install.sh` | Đã có thư mục skill cùng tên (vd `~/.claude/skills/mk-star`) không do installer tạo — có thể là skill khác. Hỏi người dùng; giữ thì đổi tên thư mục đó, bỏ thì chạy lại với `--force` |
 | `has edits not made by install.sh` | Có người sửa tay file trong skill (đã liệt kê). Giữ bản sao nếu cần, rồi chạy lại với `--force` |
 | `cannot fast-forward ~/.mk-studio` | Thư mục clone có sửa đổi riêng. Không cần giữ → `rm -rf ~/.mk-studio` rồi làm lại bước 3 |
 | `no skill named '…'` | Tên sau `--skill` không có trong `skills/` (thông báo kèm danh sách) |
-| `is a symlink` | Thư mục đích là đường tắt; thay bằng thư mục thật rồi chạy lại |
+| `is a symlink` | Thư mục đích (hoặc `~/.claude`, `~/.claude/skills`, `~/.agents/skills`) là đường tắt — installer không ghi xuyên đường tắt. Thay bằng thư mục thật, hoặc cài vào project bằng `--project` |
+| `is not at a release tag` | Bản vừa kéo về không phải bản đã phát hành (`main` lệch, hoặc clone đang ở nhánh khác) → installer không chạy mã đó. Kiểm `git -C ~/.mk-studio status` và remote; báo chủ repo nếu `main` có commit chưa gắn tag |
 
 ## Gỡ
 
