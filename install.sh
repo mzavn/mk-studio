@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Install a skill of mk-studio (copies, never symlinks). Safe to re-run: missing pieces are added, existing ones kept or updated.
-#   --skill <name>    → which skill (default star; also --skill=<name>); the ones below say star, read <name>
-#   --global          → ~/.claude/skills/star and ~/.agents/skills/star
-#   --project <dir>   → <dir>/.claude/skills/star (only the skill folder — no config, no agent files)
-#   --agents-dir      → with --project: also copy to <dir>/.agents/skills/star (kept up to date once present)
+#   --skill <name>    → which skill folder (default mk-star; also --skill=<name>); the ones below say mk-star, read <name>
+#   --global          → ~/.claude/skills/mk-star and ~/.agents/skills/mk-star
+#   --project <dir>   → <dir>/.claude/skills/mk-star (only the skill folder — no config, no agent files)
+#   --agents-dir      → with --project: also copy to <dir>/.agents/skills/mk-star (kept up to date once present)
 #   --update          → first pull the latest release (fast-forward `main`), then install; alone = --update --global.
-#                       Without --skill: refreshes every skill install.sh put there (star if none yet)
+#                       Without --skill: refreshes every skill install.sh put there (mk-star if none yet)
 #   --force           → overwrite a project copy that has local edits, or a skill folder install.sh did not create
 #   --uninstall       → remove instead of install (with --global and/or --project)
 # Flags combine: install.sh --update --global --project .
@@ -13,7 +13,7 @@
 #   (run from elsewhere, e.g. piped, it clones to $MK_STUDIO_HOME, default ~/.mk-studio, then runs from there)
 set -euo pipefail
 
-DEFAULT_SKILL=star
+DEFAULT_SKILL=mk-star
 # Piped (`… | bash`) → BASH_SOURCE is empty: never trust the current directory, always bootstrap from the clone.
 SELF="${BASH_SOURCE[0]:-}"
 ROOT=""
@@ -32,6 +32,12 @@ skill_list() {
 }
 die_skill() { die "$* (skills: $(skill_list))"; }
 
+# Code fetched from the remote runs only when it is a release: `main` holds tagged releases (vX.Y.Z) only.
+require_release() {
+  git -C "$1" tag --points-at HEAD | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$' ||
+    die "$1 is not at a release tag (vX.Y.Z) — refusing to run unreleased code; check its remote and branch (main)"
+}
+
 # Not run from a checkout: clone or refresh $MK_STUDIO_HOME and run the installer from there.
 if [ -z "$ROOT" ] || [ ! -f "$ROOT/skills/$DEFAULT_SKILL/SKILL.md" ]; then
   command -v git >/dev/null || die "git is required"
@@ -42,6 +48,7 @@ if [ -z "$ROOT" ] || [ ! -f "$ROOT/skills/$DEFAULT_SKILL/SKILL.md" ]; then
     git clone -q --depth 1 "$REPO_URL" "$home" ||
       die "cannot clone $REPO_URL (private repo: gh auth login, then gh repo clone mzavn/mk-studio $home)"
   fi
+  require_release "$home"
   MK_STUDIO_UPDATED=1 exec bash "$home/install.sh" ${ARGS[@]+"${ARGS[@]}"}
 fi
 
@@ -78,6 +85,7 @@ if [ "$UPDATE" = 1 ]; then
     before="$(git -C "$ROOT" rev-parse --short HEAD)"
     git -C "$ROOT" pull --ff-only -q ||
       die "cannot fast-forward $ROOT (local commits or edits?); resolve them, then re-run"
+    require_release "$ROOT"
     echo "mk-studio: $before → $(git -C "$ROOT" rev-parse --short HEAD)"
     MK_STUDIO_UPDATED=1 exec bash "$ROOT/install.sh" "${ARGS[@]}"  # the installer itself may have changed
   fi
@@ -140,8 +148,8 @@ refuse_edits() {
 use_skill() { SKILL="$1"; SRC="$ROOT/skills/$1"; VERSION="$(version_of "$SRC")"; }
 
 # Skills to handle at one place, given its two skill folders minus the skill name ("$1/<skill>" "$2/<skill>"):
-# --skill → that one; --update alone → every skill install.sh put there (manifest), or star when none is there yet;
-# otherwise star. In C order.
+# --skill → that one; --update alone → every skill install.sh put there (manifest), or mk-star when none is there yet;
+# otherwise mk-star. In C order.
 skills_at() {
   local f s
   if [ -n "$SKILL_ARG" ]; then echo "$SKILL_ARG"; return; fi
@@ -154,8 +162,9 @@ skills_at() {
 }
 
 do_global() {
-  local base dest old
-  for dest in "$HOME/.claude/skills/$SKILL" "$HOME/.agents/skills/$SKILL"; do no_symlink "$dest"; done
+  local base dest old p
+  for p in "$HOME/.claude" "$HOME/.claude/skills" "$HOME/.agents" "$HOME/.agents/skills" \
+           "$HOME/.claude/skills/$SKILL" "$HOME/.agents/skills/$SKILL"; do no_symlink "$p"; done
   refuse_foreign "$HOME/.claude/skills/$SKILL" "$HOME/.agents/skills/$SKILL"
   for base in "$HOME/.claude/skills" "$HOME/.agents/skills"; do
     dest="$base/$SKILL"
