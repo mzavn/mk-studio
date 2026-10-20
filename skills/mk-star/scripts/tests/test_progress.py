@@ -1,4 +1,4 @@
-"""Tests for star/scripts/progress.py (UC-504). Run: python3 -m unittest discover -s skills/star/scripts/tests"""
+"""Tests for mk-star/scripts/progress.py (UC-504). Run: python3 -m unittest discover -s skills/mk-star/scripts/tests"""
 import os
 import re
 import subprocess
@@ -234,6 +234,18 @@ class MarkTest(Base):
         res = self.mark("--gui-mentor", path, "--ngay", "2026-10-20")
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual(self.read(path), inserted.replace(b"2026-10-17\n- Case", b"2026-10-20\n- Case"))
+
+    def test_mark_refuses_a_symlink_and_leaves_no_temp_file(self):
+        target = self.write("that.md", post_text("I"))
+        link = os.path.join(self.dir, "link.md")
+        os.symlink(target, link)
+        before = self.read(target)
+        res = self.mark("--da-lam", link)
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("symlink", res.stderr + res.stdout)
+        self.assertEqual(self.read(target), before)
+        self.assertEqual(self.mark("--da-lam", target).returncode, 0)
+        self.assertEqual(sorted(os.listdir(self.dir)), ["link.md", "that.md"])
 
     def test_mark_refuses_and_keeps_file_when_line_missing_or_duplicated(self):  # AC-6
         crlf = post_text("I").replace("\n", "\r\n")

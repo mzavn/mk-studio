@@ -13,7 +13,9 @@ import argparse
 import datetime
 import os
 import re
+import stat
 import sys
+import tempfile
 from decimal import ROUND_HALF_UP, Decimal
 
 DEFAULT_DIR = "~/nhat-ky-star"
@@ -240,6 +242,8 @@ def report(shown_dir, today):
 
 def mark(path, kind, day=None):
     """Edit exactly one line; return error message or None."""
+    if os.path.islink(path):
+        return "%s là đường tắt (symlink) — không sửa qua đường tắt" % path
     if not os.path.isfile(path):
         return "không có file %s" % path
     with open(path, "rb") as f:
@@ -286,8 +290,17 @@ def mark(path, kind, day=None):
 
 
 def write_lines(path, lines):
-    with open(path, "wb") as f:
-        f.write("".join(lines).encode("utf-8"))
+    """Write next to the post, then rename over it: a crash never leaves a half-written journal entry."""
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)), prefix=".%s." % os.path.basename(path))
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write("".join(lines).encode("utf-8"))
+        os.chmod(tmp, stat.S_IMODE(os.stat(path).st_mode))
+        os.replace(tmp, path)
+    except OSError as exc:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        return "không ghi được %s: %s" % (path, exc)
     return None
 
 
