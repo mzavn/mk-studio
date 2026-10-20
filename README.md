@@ -1,130 +1,216 @@
 # mk-studio
 
-Bộ skill **content** cho AI agent (Claude Code, omp và các agent đọc thư mục skill chuẩn): viết, video, marketing, đóng gói giá trị bản thân. Mỗi skill độc lập, cài riêng từng cái.
+Bộ skill **content, review và đóng gói giá trị** cho AI coding agent (Claude Code, omp, Codex và các agent hỗ trợ chuẩn Agent Skills). Mỗi skill hoạt động độc lập, cài đặt riêng biệt theo nhu cầu.
 
-Hiện có:
+Bộ skill kỹ thuật & lập trình đi kèm là **[mk-lab](https://github.com/mzavn/mk-lab)** (Spec-Driven Development).
 
-- **`/mk:star`** — hệ nhật ký STAR 5 loại: agent dẫn bạn viết nhật ký từng câu, lưu bài ở máy, đếm tiến độ. Cài mặc định.
-- **`/mk:exec-review`** — hội đồng CEO / C-level phản biện bài viết của bạn: đọc bằng mắt chân dung khách hàng, soi giọng AI, chuẩn hoá thuật ngữ, tối ưu SEO / GEO / AEO; bạn duyệt gợi ý nào thì agent sửa đúng chỗ đó. Cài bằng `--skill mk-exec-review`.
+---
 
-Gọi skill như bộ ak: gõ `/mk:<tên>` trong Claude Code (vd `/mk:star`), hoặc nói bằng lời — agent tự nhận ra. Cài và gỡ theo tên thư mục `mk-<tên>` (`--skill mk-exec-review`). Tiền tố `mk:` là quy ước đặt tên của bộ này, không phải plugin: đã cài một plugin tên `mk` thì kiểm `/mk:star` mở đúng skill; quyền trong settings ghi theo tên mới, vd `Skill(mk:star)`.
+## Danh mục skill hiện có
 
-Bộ skill lập trình đi kèm (specs, dev, test, bảo mật) là **[mk-lab](https://github.com/mzavn/mk-lab)**.
+| Skill | Lệnh Claude Code | Gọi bằng lời tự nhiên | Mục đích chính |
+|---|---|---|---|
+| **`mk-star`** | `/mk:star` | *"viết nhật ký ngày"*, *"giải quyết vấn đề"*, *"luyện case 05"* | Hệ nhật ký STAR 5 loại: biến cảm xúc/vấn đề/thành công thành quyết định, kế hoạch và tài sản đóng gói. Lưu hoàn toàn ở máy cá nhân (`~/nhat-ky-star/`). |
+| **`mk-exec-review`** | `/mk:exec-review <file>` | *"phản biện bài <đường dẫn>"*, *"đọc bài như CEO"*, *"soát bài"* | Hội đồng C-level (CEO, CFO, CMO, COO, CTO) phản biện bài viết theo chân dung khách hàng thật, bóc giọng văn AI, chuẩn hóa thuật ngữ, tối ưu SEO/GEO/AEO, duyệt từng mã gợi ý trước khi sửa. |
 
-*English summary at the end.*
+> **Quy ước tên gọi (`mk:`):**
+> - Tương tự bộ `ak`, các skill trong bộ dùng tiền tố `mk:` trong frontmatter để gọi nhanh dạng slash command: `/mk:star`, `/mk:exec-review`.
+> - Thư mục cài đặt và cờ `--skill` dùng tên gạch nối: `mk-star`, `mk-exec-review`.
+> - Tiền tố `mk:` là quy ước định danh của bộ skill này, **không** phải plugin Claude Code tên `mk`. Nếu bạn cấu hình quyền trong `settings.json`, hãy dùng tên mới: `Skill(mk:star)` hoặc `Skill(mk:exec-review)`.
 
-## mk:star — nhật ký STAR
+---
 
-`star` biến một lời than vãn thành quyết định, kế hoạch và bài học đóng gói được. Bạn kể một câu ("sáng nay cãi nhau với vợ về chuyện công ty"), agent đề xuất loại nhật ký hợp, hỏi từng câu theo mẫu và ghi nguyên văn câu trả lời vào một file markdown ở `~/nhat-ky-star/`.
+## 1. mk:star — Hệ nhật ký STAR (5 loại)
 
-| Loại | Viết khi |
-|---|---|
-| I · Daily Diary | trong ngày hoặc cuối ngày — mỗi ngày cải tiến 1% |
-| II · Problem Solving | gặp thất bại, vướng mắc — bản đầy đủ 8 bước A–Z hoặc "viết nhanh" |
-| III · Packing Value | sau một thành công — thành công thức chuyển giao được |
-| IV · Creating Future | trước sự kiện, dự án, cuộc gặp quan trọng |
-| V · Mentoring | trước buổi bán hàng, đào tạo, 1-1, coaching |
+`mk:star` đồng hành dẫn dắt bạn viết nhật ký từng câu hỏi theo đúng khuôn mẫu chuẩn, lưu thành từng file Markdown độc lập tại thư mục riêng (`~/nhat-ky-star/`) và theo dõi tiến độ qua các cột mốc thực hành.
 
-Kèm bộ câu hỏi cơ bản/chuyên sâu cho từng loại, 4 case giải mẫu và 28 case luyện tập, 8 dạng tài sản đóng gói, và `progress.py` đếm bài trọn vẹn theo cột mốc 28 / 300 / 1000 / 10000, nhắc One Action chưa làm và kết quả đến hạn ghi. Nhật ký là dữ liệu riêng: file chỉ ở máy bạn (agent cảnh báo nếu thư mục nằm trong git); nội dung trò chuyện vẫn đi qua nhà cung cấp AI của agent.
+### 5 loại nhật ký
 
-Cài xong, gõ `/mk:star` (Claude Code) hoặc nói với agent: "viết nhật ký ngày", "viết nhật ký giải quyết vấn đề", "luyện case 05", "tiến độ nhật ký".
+| Loại | Thời điểm viết | Trọng tâm đầu ra |
+|---|---|---|
+| **I · Daily Diary** | Trong ngày hoặc cuối ngày | Cải tiến 1% mỗi ngày, cam kết hành động ngày mai (*One Action* có giờ cụ thể). |
+| **II · Problem Solving** | Gặp khó khăn, vướng mắc, thất bại | Bản đầy đủ 8 bước A–Z (Situation → Think & Feel → SEE → UNDERSTAND → DECIDED → ACTION → EVOLVE) hoặc bản "viết nhanh" 4 bước (R → S → T → A). |
+| **III · Packing Value** | Sau một thành công hoặc kết quả tốt | Đóng gói kinh nghiệm thành 1 trong 8 dạng tài sản chuyển giao được. |
+| **IV · Creating Future** | Trước sự kiện, dự án hoặc cuộc gặp quan trọng | Kiến tạo kịch bản, chuẩn bị tâm thế và phương án ứng phó trước khi hành động. |
+| **V · Mentoring** | Trước buổi 1-1, đào tạo, coaching, bán hàng | Thấu cảm người đối diện (R → S → T → A) rồi soi chiếu lại năng lực người dẫn dắt. |
 
-## mk:exec-review — hội đồng C-level phản biện bài viết
+### Tính năng đi kèm
+- **Kho bài tập & Case thực hành:** 4 case giải mẫu chi tiết từng bước và 28 case tình huống quản trị/đời sống để luyện tập phản xạ giải quyết vấn đề.
+- **Theo dõi tiến độ (`progress.py`):** Tự động đếm số bài trọn vẹn theo 4 cột mốc (28 / 300 / 1.000 / 10.000 bài), cảnh báo việc hẹn chưa làm và kết quả đến hạn nghiệm thu.
+- **An toàn dữ liệu cá nhân:** Nhật ký lưu hoàn toàn cục bộ trên máy bạn; script cảnh báo nếu thư mục nằm trong git; ghi file nguyên tử (`os.replace`) chống mất dữ liệu khi gián đoạn; từ chối can thiệp qua symlink.
 
-Gõ `/mk:exec-review <đường dẫn bài>` (Claude Code) hoặc nói "phản biện bài `<đường dẫn>`". Agent đọc bài, luật viết của repo (`AGENTS.md`, `CLAUDE.md`…), file chân dung khách hàng (bắt buộc — không tìm thấy thì hỏi bạn) và bảng thuật ngữ nếu có; chạy `scan.py` đếm dấu hiệu giọng AI, biến thể thuật ngữ, vị trí từ khoá; hỏi bạn những gì file không trả lời được (người đọc chính, mục tiêu, nơi đăng, từ khoá, thuật ngữ tự đặt, mức sửa). Phần phản biện do **một agent riêng** làm — không phải agent đang trò chuyện với bạn — với các vai CEO, CFO, CMO, COO, CTO tuỳ bài. Báo cáo có bảng gợi ý đánh mã (`A1`, `T2`, `S3`…); bạn trả lời "duyệt A1 T1-T3" thì agent mới sửa file, giữ nguyên ý, ví dụ và giọng của bạn, không thêm số liệu (chỗ cần số để ô `[điền: …]`).
+---
 
-```bash
-bash ~/.mk-studio/install.sh --global --skill mk-exec-review
-```
+## 2. mk:exec-review — Hội đồng C-level phản biện bài viết
 
-## Yêu cầu
+`mk:exec-review` đóng vai trò một ban cố vấn lãnh đạo độc lập đọc bài viết tiếng Việt (Markdown) bằng lăng kính của chân dung khách hàng mục tiêu (*Customer Persona*), rà soát toàn diện trước khi xuất bản.
 
-- `bash` (macOS hoặc Linux), `python3` ≥ 3.8, `git`.
-- Quyền đọc repo `mzavn/mk-studio` (repo đang **private**) và [GitHub CLI](https://cli.github.com) đã đăng nhập (`gh auth status`).
-- Một coding agent hỗ trợ skill (Claude Code, omp, Codex…).
+### 5 góc nhìn phản biện
+
+1. **Hội đồng C-level theo Persona:** Chọn 2–4 vai lãnh đạo phù hợp (CEO: chiến lược & hành động; CFO: chi phí & ROI; CMO: khách hàng & thông điệp; COO: quy trình vận hành; CTO: khả thi công nghệ). Chỉ ra chính xác dòng giữ chân, dòng gây mất niềm tin và câu hỏi còn mắc lại.
+2. **Soi dấu hiệu giọng văn AI:** Nhận diện các cấu trúc sáo mòn tiếng Việt (mở bài sáo, đối lập lật ngược lặp lại, từ ngữ phô trương, dịch thô từ tiếng Anh, lạm dụng gạch nối `—`), bảo vệ các câu mang chất giọng người thật và ví dụ thực chiến.
+3. **Chuẩn hóa thuật ngữ:** Phát hiện đồng nghĩa trôi dạt, sai lệch vị trí dấu thanh (hoá/hóa), gạch nối/viết hoa giữa câu (Fanpage/fanpage); đề xuất dạng chuẩn dựa trên bảng thuật ngữ hoặc định nghĩa gốc của tác giả; tuyệt đối không gộp các khái niệm cố ý tách biệt hoặc từ ngữ ẩn dụ.
+4. **Tối ưu SEO / GEO / AEO:** 
+   - *SEO:* Khớp ý định tìm kiếm thực tế của persona, tối ưu tiêu đề và thẻ mô tả.
+   - *AEO (Answer Engine):* Câu trả lời định nghĩa súc tích 40–60 tiếng ngay dưới tiêu đề dạng hỏi, cấu trúc độc lập.
+   - *GEO (Generative Engine - ChatGPT/Perplexity/AI Overviews):* Trích dẫn được, thực thể định danh rõ ràng, E-E-A-T minh bạch từ trải nghiệm thực tế.
+5. **Ý tưởng cải thiện (Mã Y):** Đề xuất 3–5 hướng nâng cấp bài viết (ví dụ gần gũi hơn, con số tự nhẩm trong 1 phút, câu hỏi mang vào cuộc họp) có xếp hạng mức độ tác động.
+
+### Bất biến & Quy trình duyệt sửa
+- **Tác giả làm chủ:** Phản biện được tách riêng sang một subagent độc lập (chỉ đọc). Báo cáo trả về bảng gợi ý đánh mã (`A` giọng AI, `T` thuật ngữ, `S` SEO/GEO, `C` hội đồng, `Y` ý tưởng).
+- **Kiểm cơ học bằng script (`check_report.py`):** Kiểm tra tính duy nhất của đoạn trích, vị trí dòng, loại sửa, không sinh số liệu mới, không đổi đích link/ảnh/HTML ngầm.
+- **Duyệt trước khi sửa:** Tác giả duyệt mã nào (`duyệt A1 T1-T3`, `S1:2`), agent chỉ sửa đúng mã đó. Tuyệt đối giữ nguyên tone giọng, cấu trúc lập luận và ví dụ gốc của tác giả. Chỗ thiếu số liệu sẽ để ô `[điền: …]`, không bao giờ bịa đặt.
+
+---
+
+## Yêu cầu môi trường
+
+- Hệ điều hành: macOS hoặc Linux (hỗ trợ `bash` 3.2 trở lên).
+- Python: `python3` ≥ 3.8 (chỉ sử dụng thư viện chuẩn, không cần cài thư viện ngoài).
+- Công cụ: `git`, và [GitHub CLI](https://cli.github.com) đã đăng nhập (`gh auth status`) vì kho chứa là **private**.
+- Coding agent: Bất kỳ agent nào đọc thư mục skill chuẩn (`.claude/skills` hoặc `.agents/skills` như Claude Code, omp, Codex…).
+
+---
 
 ## Cài đặt
 
-Hướng dẫn từng bước (đưa cho agent tự cài được): [INSTALL.md](INSTALL.md).
+Xem chi tiết từng bước cho người và agent tại [INSTALL.md](INSTALL.md).
+
+### 1. Cài đặt toàn hệ thống (Global)
+Mặc định cài đặt `mk-star` vào `~/.claude/skills/mk-star` và `~/.agents/skills/mk-star`:
 
 ```bash
 gh repo clone mzavn/mk-studio ~/.mk-studio && bash ~/.mk-studio/install.sh --global
 ```
 
-Lệnh chép `mk-star` vào `~/.claude/skills/mk-star` và `~/.agents/skills/mk-star`. Các cách khác:
+### 2. Cài đặt skill cụ thể
+Chỉ định tên thư mục skill qua cờ `--skill`:
 
 ```bash
-bash ~/.mk-studio/install.sh --project ~/code/my-blog               # vào một project: .claude/skills/mk-star
-bash ~/.mk-studio/install.sh --project . --agents-dir               # thêm .agents/skills/mk-star (vd Codex)
-bash ~/.mk-studio/install.sh --global --skill <tên>                 # skill khác của bộ, theo tên thư mục (mặc định mk-star)
+# Cài đặt bộ phản biện exec-review cho toàn hệ thống
+bash ~/.mk-studio/install.sh --global --skill mk-exec-review
+
+# Cài đặt cả 2 skill
+bash ~/.mk-studio/install.sh --global --skill mk-star
+bash ~/.mk-studio/install.sh --global --skill mk-exec-review
 ```
 
-- Luôn **chép**, không symlink; chạy lại bao nhiêu lần cũng được, script in phiên bản cũ → mới.
-- Chỉ chép thư mục skill — không tạo cấu hình, không đụng `AGENTS.md`/`CLAUDE.md`.
-- Thư mục skill cùng tên mà không do `install.sh` tạo thì bị từ chối (có thể là skill của công cụ khác), trừ `--force`. Bản trong project có file sửa tay cũng bị từ chối, kèm danh sách file.
-
-## Cập nhật
-
-Skill phát hành theo bản (`vX.Y.Z`, xem [CHANGELOG.md](CHANGELOG.md)); nhánh `main` chỉ chứa bản đã phát hành.
+### 3. Cài đặt vào một dự án cụ thể (Project-level)
+Chép skill vào thư mục `.claude/skills/<tên-skill>` của dự án (thêm `--agents-dir` nếu dùng Codex/omp):
 
 ```bash
-bash ~/.mk-studio/install.sh --update                          # bản cài chung: mọi skill đã cài bằng install.sh
-bash ~/.mk-studio/install.sh --update --global --project .     # đứng trong project: cả hai
+bash ~/.mk-studio/install.sh --project ~/code/my-content --skill mk-exec-review
+bash ~/.mk-studio/install.sh --project . --agents-dir --skill mk-exec-review
 ```
 
-Clone ở chỗ khác thì thay `~/.mk-studio` bằng đường dẫn đó (ghi trong `~/.claude/skills/mk-star/.mk-studio-source`).
-
-## Gỡ cài đặt
-
-```bash
-bash ~/.mk-studio/install.sh --uninstall --global
-bash ~/.mk-studio/install.sh --uninstall --project ~/code/my-blog
-```
-
-Gỡ `star` không đụng bài nhật ký trong `~/nhat-ky-star/`.
-
-## Cấu trúc repo
-
-```
-mk-studio/
-├── install.sh
-├── INSTALL.md
-├── CHANGELOG.md
-├── LICENSE
-├── README.md
-├── tests/                       test cho install.sh (không chép vào skill)
-└── skills/
-    ├── mk-star/
-    │   ├── SKILL.md             điểm vào: chọn loại, cách dẫn, định dạng bài, an toàn
-    │   ├── references/          tong-quan, loai-i … loai-v, case-mau, kho-case
-    │   ├── assets/mau/          mẫu bài từng loại
-    │   └── scripts/             progress.py, tests/
-    └── mk-exec-review/
-        ├── SKILL.md             luồng: gom ngữ cảnh → hỏi → agent riêng phản biện → duyệt → sửa
-        ├── references/          hoi-dong, giong-ai, thuat-ngu, seo-geo-aeo
-        ├── assets/              goi-phan-bien (giao việc cho agent riêng), mau-bao-cao
-        └── scripts/             scan.py, check_report.py, tests/
-```
-
-## Đóng góp
-
-- Gửi vào nhánh `dev` (`main` chỉ chứa bản đã phát hành). Commit theo Conventional Commits, scope là tên skill (`feat(mk-star): …`); loại commit quyết định số phiên bản (CHANGELOG.md) — đổi chữ trong `skills/` mà người dùng thấy khác là `feat`/`fix`, không phải `docs`.
-- Scripts chỉ thư viện chuẩn, đầu ra tất định; chạy `python3 -m unittest discover -s skills/<tên>/scripts/tests` cho từng skill và `python3 -m unittest discover -s tests` (installer).
-- `SKILL.md` và mỗi reference dưới 300 dòng; ví dụ dùng dữ liệu giả.
-- Ghi thay đổi vào mục `## Chưa phát hành` của CHANGELOG.md bằng lời người dùng.
-
-## Ghi công
-
-Skill `mk:star` tổng hợp từ tài liệu **X3 Năng Suất** ([minhvq.notion.site](https://minhvq.notion.site)) — "Video tự học STAR bậc cao" và "Thực hành Giải quyết vấn đề từ A-Z"; phần do người tổng hợp soạn thêm ghi trong `skills/star/references/tong-quan.md` mục Nguồn gốc. Phát hành theo đồng ý của chủ nội dung.
-
-## Giấy phép
-
-MIT — xem [LICENSE](LICENSE).
+*Nguyên tắc cài đặt:* Luôn sao chép trực tiếp file, không dùng symlink; có manifest kiểm soát thay đổi; từ chối ghi đè nếu phát hiện sửa đổi thủ công trừ khi có `--force`.
 
 ---
 
-## English
+## Cập nhật & Gỡ cài đặt
 
-**mk-studio** is a set of content skills for AI coding agents — writing, video, marketing, packaging personal know-how. Its programming counterpart is [mk-lab](https://github.com/mzavn/mk-lab). The first skill, **mk:star**, is a Vietnamese STAR journaling coach: five journal types (daily diary, A–Z problem solving with a short variant, packing a success, creating the future, mentoring), the full question bank with basic/deep tiers, four worked cases and 28 practice cases, and `progress.py` that counts complete entries against milestones. Entries are plain markdown files in `~/nhat-ky-star/`. **mk:exec-review** has a separate sub-agent critique a Vietnamese article as a C-level panel reading through your customer persona — AI-sounding prose, terminology consistency, SEO/GEO/AEO — and edits the file only for the suggestion codes you approve, keeping your voice.
+### Cập nhật
+Cập nhật kéo bản phát hành mới nhất từ nhánh `main` (chỉ cập nhật tới commit có gắn tag release `vX.Y.Z`):
 
-The repo is private for now. Install with `gh repo clone mzavn/mk-studio ~/.mk-studio && bash ~/.mk-studio/install.sh --global` (copies to `~/.claude/skills/mk-star` and `~/.agents/skills/mk-star`; `--project <dir>` for one repo, `--skill <name>` for another skill, `--update` to pull the latest release and refresh every skill it installed, `--uninstall` to remove). Requirements: bash, python3 ≥ 3.8, git, an authenticated `gh`. Content of `star` is compiled from X3 Năng Suất material (minhvq.notion.site) with the owner's consent. License: MIT.
+```bash
+# Cập nhật tất cả skill đã cài đặt toàn hệ thống
+bash ~/.mk-studio/install.sh --update
+
+# Cập nhật cả bản global và bản project hiện tại
+bash ~/.mk-studio/install.sh --update --global --project .
+```
+
+### Gỡ cài đặt
+Gỡ bỏ thư mục skill an toàn (không làm ảnh hưởng tới bài viết hay dữ liệu nhật ký tại `~/nhat-ky-star/`):
+
+```bash
+bash ~/.mk-studio/install.sh --uninstall --global --skill mk-exec-review
+bash ~/.mk-studio/install.sh --uninstall --project ~/code/my-content --skill mk-exec-review
+```
+
+---
+
+## An toàn & Bảo mật
+
+Bộ công cụ được thiết kế theo tiêu chuẩn an toàn cho Agentic SE:
+- **Bảo vệ đường dẫn & Symlink:** Bộ installer từ chối ghi hoặc xoá xuyên qua symlink (kể cả thư mục cha như `~/.claude` hay `~/.claude/skills`); ngăn chặn rò rỉ đường dẫn máy cá nhân vào dotfiles công khai.
+- **Toàn vẹn phát hành:** Lệnh `--update` bắt buộc kiểm tra chữ ký/tag phát hành ngữ nghĩa (`vX.Y.Z`), từ chối thực thi mã chưa qua phát hành chính thức từ nhánh `main`.
+- **Chống Prompt Injection & Rò rỉ dữ liệu:**
+  - Dữ liệu bài viết, chân dung khách hàng và quy ước dự án được đối xử là **dữ liệu thuần túy**, không phải câu lệnh chỉ thị.
+  - Subagent phản biện bị cô lập trong môi trường chỉ đọc (`read-only`), không quyền thực thi lệnh shell, không truy cập internet, không duyệt link trỏ ra ngoài repository.
+  - Mọi thao tác tạm thời của phiên làm việc diễn ra trong thư mục bảo mật riêng biệt (`mktemp -d`), được dọn dẹp sạch sau khi hoàn tất.
+
+---
+
+## Cấu trúc repository
+
+```
+mk-studio/
+├── install.sh                       # Bộ cài đặt idempotent chuẩn POSIX (bash 3.2+)
+├── INSTALL.md                       # Sổ tay hướng dẫn cài đặt cho người và agent
+├── CHANGELOG.md                     # Lịch sử thay đổi các phiên bản
+├── LICENSE                          # Giấy phép nguồn mở MIT
+├── README.md
+├── tests/                           # Kiểm thử tự động cho installer
+└── skills/
+    ├── mk-star/                     # Skill nhật ký STAR (/mk:star)
+    │   ├── SKILL.md                 # Điểm điều phối, bộ câu hỏi, quy tắc an toàn
+    │   ├── references/              # Hướng dẫn chi tiết 5 loại, kho case, bảng đối chiếu
+    │   ├── assets/mau/              # Khung mẫu bài viết chuẩn cho từng loại
+    │   └── scripts/                 # progress.py đo lường tiến độ và test suite
+    └── mk-exec-review/              # Skill hội đồng phản biện CxO (/mk:exec-review)
+        ├── SKILL.md                 # Quy trình 5 bước: gom ngữ cảnh -> giao việc -> kiểm duyệt -> sửa
+        ├── references/              # Bộ tiêu chí hội đồng, bóc giọng AI, chuẩn thuật ngữ, SEO/GEO/AEO
+        ├── assets/                  # Mẫu giao việc cho subagent và mẫu báo cáo chuẩn
+        └── scripts/                 # scan.py quét số liệu, check_report.py kiểm cơ học và test suite
+```
+
+---
+
+## Đóng góp & Phát triển
+
+Dự án phát triển trên nhánh `dev` (`main` chỉ chứa các bản phát hành chính thức).
+
+1. Commit tuân thủ chuẩn Conventional Commits, scope là tên thư mục skill: `feat(mk-star): …`, `feat(mk-exec-review): …`, `fix(install): …`.
+2. Kiểm tra chất lượng (Definition of Done) trước khi phát hành:
+   ```bash
+   # Chạy toàn bộ test suites
+   python3 -m unittest discover -s skills/mk-star/scripts/tests && \
+   python3 -m unittest discover -s skills/mk-exec-review/scripts/tests && \
+   python3 -m unittest discover -s tests && \
+   python3 -m unittest discover -s tools/tests
+
+   # Kiểm tra cú pháp shell
+   bash -n install.sh && /bin/bash -n install.sh
+
+   # Kiểm tra độ đầy đủ dữ liệu STAR (phải 0 thiếu)
+   python3 plans/tools/star_fidelity.py plans/sources/he-nhat-ky-star.xlsx skills/mk-star
+
+   # Kiểm tra tính hợp lệ của frontmatter và cấu trúc skill
+   python3 ~/.agents/skills/ak-skill-creator/scripts/quick_validate.py skills/mk-star && \
+   python3 ~/.agents/skills/ak-skill-creator/scripts/quick_validate.py skills/mk-exec-review
+   ```
+
+---
+
+## Ghi công
+
+- Skill **`mk:star`** được tổng hợp và chuyển hóa từ phương pháp luận nhật ký của **X3 Năng Suất** ([minhvq.notion.site](https://minhvq.notion.site)) — *"Video tự học STAR bậc cao"* và *"Thực hành Giải quyết vấn đề từ A-Z"*, phát hành theo sự đồng ý của tác giả nội dung.
+- Skill **`mk:exec-review`** kế thừa tư duy biên tập thực chiến và mô hình kiểm duyệt đa tầng cho nhà sáng tạo nội dung.
+
+---
+
+## Giấy phép
+
+Phát hành theo giấy phép nguồn mở [MIT License](LICENSE).
+
+---
+
+## English Summary
+
+**mk-studio** is a collection of production-grade content and review skills for AI coding agents (Claude Code, omp, Codex, etc.). Its technical engineering counterpart is **[mk-lab](https://github.com/mzavn/mk-lab)**.
+
+- **`/mk:star` (STAR Journaling Coach):** Guides users through five structured reflective journaling frameworks (Daily Diary, Problem Solving A–Z, Packing Value, Creating Future, Mentoring), backed by a 28-case practice repository, automated milestone metrics (`progress.py`), and privacy-first local storage in `~/nhat-ky-star/`.
+- **`/mk:exec-review` (C-Suite Editorial Review):** Deploys an isolated read-only subagent acting as an executive board (CEO, CFO, CMO, COO, CTO) to critique Vietnamese Markdown articles through real customer personas. Audits AI-generated writing tells, standardizes specialized/coined terminology, optimizes for SEO/AEO/GEO, and enforces strict mechanical verification (`check_report.py`) before applying user-approved edits while preserving authentic author voice.
+
+Install via `bash install.sh --global --skill <name>`. Both skills adhere to strict local isolation, symlink protection, release tag verification, and data safety constraints. Licensed under MIT.
