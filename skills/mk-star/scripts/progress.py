@@ -18,6 +18,8 @@ import sys
 import tempfile
 from decimal import ROUND_HALF_UP, Decimal
 
+sys.dont_write_bytecode = True  # không để __pycache__ trong thư mục skill
+
 DEFAULT_DIR = "~/nhat-ky-star"
 MAU = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "mau")
 TEMPLATES = {("I", ""): "i.md", ("II", "đầy đủ"): "ii-day-du.md", ("II", "ngắn"): "ii-ngan.md",
