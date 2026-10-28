@@ -12,10 +12,11 @@ Bộ skill kỹ thuật & lập trình đi kèm là **[mk-lab](https://github.co
 |---|---|---|---|
 | **`mk-star`** | `/mk:star` | *"viết nhật ký ngày"*, *"giải quyết vấn đề"*, *"luyện case 05"* | Hệ nhật ký STAR 5 loại: biến cảm xúc/vấn đề/thành công thành quyết định, kế hoạch và tài sản đóng gói. Lưu hoàn toàn ở máy cá nhân (`~/nhat-ky-star/`). |
 | **`mk-exec-review`** | `/mk:exec-review <file>` | *"phản biện bài <đường dẫn>"*, *"đọc bài như CEO"*, *"soát bài"* | Hội đồng C-level (CEO, CFO, CMO, COO, CTO) phản biện bài viết theo chân dung khách hàng thật, bóc giọng văn AI, chuẩn hóa thuật ngữ, tối ưu SEO/GEO/AEO, duyệt từng mã gợi ý trước khi sửa. |
+| **`mk-subtitle`** | `/mk:subtitle <file>` | *"xử lý phụ đề <file>"*, *"cắt ừ à"*, *"dịch phụ đề sang tiếng Anh"* | Phụ đề cho khâu dựng video: đánh dấu từ đệm để bạn duyệt, xoá khỏi phụ đề kèm danh sách đoạn cắt cho editor, chuẩn hoá tiếng Việt, dịch tiếng Anh khớp mốc thời gian, phụ đề cho timeline đã cắt. |
 
 > **Lưu ý tên lệnh và quyền:**
-> - Gọi nhanh qua slash command: `/mk:star`, `/mk:exec-review`. Thư mục cài đặt và cờ `--skill` dùng tên gạch nối: `mk-star`, `mk-exec-review`.
-> - Tiền tố `mk:` là quy ước định danh riêng của bộ skill này, **không** phải plugin Claude Code tên `mk`. Nếu bạn cấu hình quyền trong `settings.json`, hãy khai báo theo tên skill: `Skill(mk:star)` hoặc `Skill(mk:exec-review)`.
+> - Gọi nhanh qua slash command: `/mk:star`, `/mk:exec-review`, `/mk:subtitle`. Thư mục cài đặt và cờ `--skill` dùng tên gạch nối: `mk-star`, `mk-exec-review`, `mk-subtitle`.
+> - Tiền tố `mk:` là quy ước định danh riêng của bộ skill này, **không** phải plugin Claude Code tên `mk`. Nếu bạn cấu hình quyền trong `settings.json`, hãy khai báo theo tên skill, vd `Skill(mk:star)`.
 ---
 
 ## 1. mk:star — Hệ nhật ký STAR (5 loại)
@@ -61,6 +62,21 @@ Bộ skill kỹ thuật & lập trình đi kèm là **[mk-lab](https://github.co
 
 ---
 
+## 3. mk:subtitle — Phụ đề cho khâu dựng video
+
+Gõ `/mk:subtitle <file .srt hoặc .vtt>`. Skill nhận phụ đề có sẵn (kể cả phụ đề tự động của YouTube, có mốc thời gian từng từ) và làm 4 việc:
+
+1. **Từ đệm "à, ừ, ờ, ừm…" và lặp từ:** đánh dấu thành hai nhóm — A (âm đệm giữa câu, đề xuất xoá) và B (cần nghe lại: câu đáp "Ừ, đúng rồi", tiểu từ hỏi "Thế à?", lặp từ). Bạn duyệt mã nào thì mới xoá khỏi phụ đề và đưa vào danh sách đoạn cắt cho editor.
+2. **Chia câu, ngắt dòng:** tối đa 2 dòng × 42 ký tự, cảnh báo cue đọc không kịp.
+3. **Chuẩn hoá tiếng Việt:** sửa lỗi nhận giọng theo bảng thuật ngữ của repo (vd bảng "ghi âm sai → chuẩn" trong `CLAUDE.md`), chính tả, dấu câu, số; giữ đúng lời người nói, chỗ nghe không rõ liệt kê để bạn xác nhận.
+4. **Dịch tiếng Anh:** mỗi cue dịch đúng một cue, cùng mốc thời gian.
+
+Đầu ra là một thư mục mới cạnh file gốc (file gốc không bị đụng): phụ đề Việt/Anh cho video gốc, phụ đề Việt/Anh cho video **sau khi cắt**, track `✂` chỉ chỗ cắt trên timeline, danh sách đoạn cắt `.csv`, và `BAN-GIAO.md` hướng dẫn editor. Mọi file là `.srt` nên dùng được với CapCut, Premiere Pro, DaVinci Resolve, Final Cut Pro.
+
+Cắt chính xác tới từng từ khi đầu vào là phụ đề tự động YouTube; với SRT thường, từ đệm giữa câu chỉ có mốc ước lượng để editor nghe rồi cắt.
+
+---
+
 ## Yêu cầu môi trường
 
 - Hệ điều hành: macOS hoặc Linux (hỗ trợ `bash` 3.2 trở lên).
@@ -88,9 +104,10 @@ Chỉ định tên thư mục skill qua cờ `--skill`:
 # Cài đặt bộ phản biện exec-review cho toàn hệ thống
 bash ~/.mk-studio/install.sh --global --skill mk-exec-review
 
-# Cài đặt cả 2 skill
+# Cài đặt cả 3 skill
 bash ~/.mk-studio/install.sh --global --skill mk-star
 bash ~/.mk-studio/install.sh --global --skill mk-exec-review
+bash ~/.mk-studio/install.sh --global --skill mk-subtitle
 ```
 
 ### 3. Cài đặt vào một dự án cụ thể (Project-level)
@@ -156,11 +173,16 @@ mk-studio/
     │   ├── references/              # Hướng dẫn chi tiết 5 loại, kho case, bảng đối chiếu
     │   ├── assets/mau/              # Khung mẫu bài viết chuẩn cho từng loại
     │   └── scripts/                 # progress.py đo lường tiến độ và test suite
-    └── mk-exec-review/              # Skill hội đồng phản biện CxO (/mk:exec-review)
-        ├── SKILL.md                 # Quy trình 5 bước: gom ngữ cảnh -> giao việc -> kiểm duyệt -> sửa
-        ├── references/              # Bộ tiêu chí hội đồng, bóc giọng AI, chuẩn thuật ngữ, SEO/GEO/AEO
-        ├── assets/                  # Mẫu giao việc cho subagent và mẫu báo cáo chuẩn
-        └── scripts/                 # scan.py quét số liệu, check_report.py kiểm cơ học và test suite
+    ├── mk-exec-review/              # Skill hội đồng phản biện CxO (/mk:exec-review)
+    │   ├── SKILL.md                 # Quy trình 5 bước: gom ngữ cảnh -> giao việc -> kiểm duyệt -> sửa
+    │   ├── references/              # Bộ tiêu chí hội đồng, bóc giọng AI, chuẩn thuật ngữ, SEO/GEO/AEO
+    │   ├── assets/                  # Mẫu giao việc cho subagent và mẫu báo cáo chuẩn
+    │   └── scripts/                 # scan.py quét số liệu, check_report.py kiểm cơ học và test suite
+    └── mk-subtitle/                 # Skill phụ đề cho khâu dựng video (/mk:subtitle)
+        ├── SKILL.md                 # Quy trình: quét -> duyệt từ đệm -> chuẩn hoá -> dịch -> giao editor
+        ├── references/              # Từ đệm, chuẩn hoá tiếng Việt, dịch tiếng Anh
+        ├── assets/                  # Mẫu BAN-GIAO.md cho editor
+        └── scripts/                 # subtitle.py (scan, fillers, clean, export, build, check, retime) và test suite
 ```
 
 ---
@@ -169,12 +191,13 @@ mk-studio/
 
 Dự án phát triển trên nhánh `dev` (`main` chỉ chứa các bản phát hành chính thức).
 
-1. Commit tuân thủ chuẩn Conventional Commits, scope là tên thư mục skill: `feat(mk-star): …`, `feat(mk-exec-review): …`, `fix(install): …`.
+1. Commit tuân thủ chuẩn Conventional Commits, scope là tên thư mục skill: `feat(mk-star): …`, `feat(mk-subtitle): …`, `fix(install): …`.
 2. Kiểm tra chất lượng (Definition of Done) trước khi phát hành:
    ```bash
    # Chạy toàn bộ test suites
    python3 -m unittest discover -s skills/mk-star/scripts/tests && \
    python3 -m unittest discover -s skills/mk-exec-review/scripts/tests && \
+   python3 -m unittest discover -s skills/mk-subtitle/scripts/tests && \
    python3 -m unittest discover -s tests && \
    python3 -m unittest discover -s tools/tests
 
@@ -187,6 +210,7 @@ Dự án phát triển trên nhánh `dev` (`main` chỉ chứa các bản phát 
 
 - Skill **`mk:star`** được tổng hợp và chuyển hóa từ phương pháp luận nhật ký của **X3 Năng Suất** ([minhvq.notion.site](https://minhvq.notion.site)) — *"Video tự học STAR bậc cao"* và *"Thực hành Giải quyết vấn đề từ A-Z"*, phát hành theo sự đồng ý của tác giả nội dung.
 - Skill **`mk:exec-review`** kế thừa tư duy biên tập thực chiến và mô hình kiểm duyệt đa tầng cho nhà sáng tạo nội dung.
+- Skill **`mk:subtitle`** đúc kết từ quy trình biên tập transcript họp và giao phụ đề cho team dựng video.
 
 ---
 
@@ -202,5 +226,6 @@ Phát hành theo giấy phép nguồn mở [MIT License](LICENSE).
 
 - **`/mk:star` (STAR Journaling Coach):** Guides users through five structured reflective journaling frameworks (Daily Diary, Problem Solving A–Z, Packing Value, Creating Future, Mentoring), backed by a 28-case practice repository, automated milestone metrics (`progress.py`), and privacy-first local storage in `~/nhat-ky-star/`.
 - **`/mk:exec-review` (C-Suite Editorial Review):** Deploys an isolated read-only subagent acting as an executive board (CEO, CFO, CMO, COO, CTO) to critique Vietnamese Markdown articles through real customer personas. Audits AI-generated writing tells, standardizes specialized/coined terminology, optimizes for SEO/AEO/GEO, and enforces strict mechanical verification (`check_report.py`) before applying user-approved edits while preserving authentic author voice.
+- **`/mk:subtitle` (Subtitles for Video Editing):** Takes an existing SRT/VTT file (including YouTube auto-captions with per-word timing), flags filler sounds and stutters for user approval, removes approved ones and exports an exact cut list, re-splits lines to subtitle standards, fixes Vietnamese speech-recognition errors and terminology, translates to English on the same timings, and re-times subtitles for the cut timeline — all as `.srt` files that CapCut, Premiere Pro, DaVinci Resolve and Final Cut Pro import.
 
-Install via `bash install.sh --global --skill <name>`. Both skills adhere to strict local isolation, symlink protection, release tag verification, and data safety constraints. Licensed under MIT.
+Install via `bash install.sh --global --skill <name>`. All skills adhere to strict local isolation, symlink protection, release tag verification, and data safety constraints. Licensed under MIT.

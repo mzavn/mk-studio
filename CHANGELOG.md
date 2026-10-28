@@ -8,6 +8,16 @@ Mỗi bản có số dạng `X.Y.Z` (chung cho cả bộ skill):
 
 Cập nhật: `bash ~/.mk-studio/install.sh --update`.
 
+## Chưa phát hành
+
+Dự kiến: v0.2.0
+
+### mk-subtitle
+
+**Mới**
+
+- **Skill `mk:subtitle` — phụ đề cho khâu dựng video.** Gõ `/mk:subtitle <file .srt/.vtt>` (kể cả phụ đề tự động của YouTube). Agent đánh dấu từ đệm "à, ừ, ờ, ừm…" và lặp từ thành hai nhóm để bạn duyệt; mã nào được duyệt mới bị xoá khỏi phụ đề và đưa vào danh sách đoạn cắt cho editor (chính xác tới từng từ với phụ đề YouTube). Sau đó chia câu, ngắt dòng theo chuẩn phụ đề, sửa lỗi nhận giọng và thuật ngữ tiếng Việt theo bảng thuật ngữ của repo, dịch sang tiếng Anh cùng mốc thời gian, và tính lại giờ phụ đề cho video đã cắt. Kết quả là một thư mục mới (file gốc giữ nguyên) gồm các file `.srt` dùng được với CapCut, Premiere Pro, DaVinci Resolve, Final Cut Pro và `BAN-GIAO.md` hướng dẫn editor. Cài: `bash ~/.mk-studio/install.sh --global --skill mk-subtitle`.
+
 ## v0.1.0 — 20/10/2026
 
 ### mk-star
