@@ -17,6 +17,8 @@ import sys
 import unicodedata
 from collections import Counter
 
+sys.dont_write_bytecode = True  # không để __pycache__ trong thư mục skill
+
 TONES = {"\u0300", "\u0301", "\u0303", "\u0309", "\u0323"}  # huyền, sắc, ngã, hỏi, nặng
 W = r"[^\W_]"  # một chữ cái/chữ số Unicode
 QUESTION_WORDS = r"(là gì|vì sao|tại sao|như thế nào|thế nào|khi nào|bao nhiêu|có nên|làm sao|ở đâu|ai )"
