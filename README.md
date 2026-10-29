@@ -13,7 +13,7 @@ Bộ skill kỹ thuật & lập trình đi kèm là **[mk-lab](https://github.co
 | **`mk-star`** | `/mk:star` | *"viết nhật ký ngày"*, *"giải quyết vấn đề"*, *"luyện case 05"* | Hệ nhật ký STAR 5 loại: biến cảm xúc/vấn đề/thành công thành quyết định, kế hoạch và tài sản đóng gói. Lưu hoàn toàn ở máy cá nhân (`~/nhat-ky-star/`). |
 | **`mk-exec-review`** | `/mk:exec-review <file>` | *"phản biện bài <đường dẫn>"*, *"đọc bài như CEO"*, *"soát bài"* | Hội đồng C-level (CEO, CFO, CMO, COO, CTO) phản biện bài viết theo chân dung khách hàng thật, bóc giọng văn AI, chuẩn hóa thuật ngữ, tối ưu SEO/GEO/AEO, duyệt từng mã gợi ý trước khi sửa. |
 | **`mk-subtitle`** | `/mk:subtitle <file>` | *"xử lý phụ đề <file>"*, *"cắt ừ à"*, *"chia file con"*, *"cắt bài giảng"* | Phụ đề cho khâu dựng video và chia buổi học dài thành file con: duyệt từ đệm xoá khỏi phụ đề kèm danh sách cắt, chuẩn hoá tiếng Việt, dịch tiếng Anh, lập Bảng lệnh Editor (Action Sheet) cắt rác/giải lao và chia bài giảng 20–30p giữ trọn vẹn ngữ cảnh vấn đáp. |
-| **`mk-video-cutter`** | `/mk:video-cutter <video>` | *"cắt video"*, *"chia clip con"*, *"bỏ thanh zoom"*, *"video dọc 9:16"*, *"nâng 1080p"* | Cắt video bài giảng dài thành clip chuyên đề theo Action Sheet: tự cắt viền thừa của video quay màn hình (thanh menu, thanh Zoom, dải đen) có ảnh xem trước để duyệt, xuất khung 16:9 / 9:16 / tuỳ chỉnh chuẩn 1080p giữ trọn hình, hoặc giữ nguyên hình gốc; cân bằng âm thanh hai tai, chuẩn âm lượng -16 LUFS, nghiệm thu bằng `ffprobe`. |
+| **`mk-video-cutter`** | `/mk:video-cutter <video>` | *"cắt video"*, *"chia clip con"*, *"bỏ thanh zoom"*, *"video dọc 9:16"*, *"nâng 1080p"*, *"làm nét video"* | Cắt video bài giảng dài thành clip chuyên đề theo Action Sheet: tự cắt viền thừa của video quay màn hình (thanh menu, thanh Zoom, dải đen) có ảnh xem trước để duyệt, xuất khung 16:9 / 9:16 / tuỳ chỉnh ở chuẩn phù hợp nguồn (720p → 1080p), làm nét vừa phải, giữ trọn hình, hoặc giữ nguyên hình gốc; cân bằng âm thanh hai tai, chuẩn âm lượng -16 LUFS, nghiệm thu bằng `ffprobe`. |
 
 > **Lưu ý tên lệnh và quyền:**
 > - Gọi nhanh qua slash command: `/mk:star`, `/mk:exec-review`, `/mk:subtitle`, `/mk:video-cutter`. Thư mục cài đặt và cờ `--skill` dùng tên gạch nối: `mk-star`, `mk-exec-review`, `mk-subtitle`, `mk-video-cutter`.
@@ -92,9 +92,10 @@ Gõ `/mk:video-cutter <file_video.mp4> --sheet <file_action_sheet>`. Skill phân
 
 1. **Khảo sát âm thanh:** đo độ lớn hai tai, phát hiện điếc một bên hoặc âm lượng quá nhỏ, chọn chế độ `copy` (giữ nguyên), `balance` (dual-mono) hoặc `master` (dual-mono + chuẩn -16 LUFS).
 2. **Khung hình sạch (mới):** video quay cả cửa sổ Zoom thường dính thanh menu, thanh công cụ và dải đen. Skill tìm vùng bài giảng (phần chuyển động) và xuất 2 ảnh xem trước: khung đỏ = phần giữ, và một khung hình thành phẩm. Bạn duyệt rồi mới cắt. Nếu Zoom đổi bố cục giữa buổi, skill báo đoạn bị ảnh hưởng để cắt riêng.
-3. **Khung đầu ra:** 16:9, 9:16, 1:1, 4:5 hoặc kích thước tuỳ chỉnh; 1080p hoặc giữ độ phân giải gốc. Mặc định giữ trọn hình và bù nền đen; video dọc có thể dùng nền mờ. Nâng 720p lên 1080p chỉ giúp đạt khung chuẩn, không làm hình nét hơn bản gốc.
-4. **Chất lượng:** không đổi khung thì hình giữ nguyên từng điểm ảnh, cắt cả bài trong vài giây. Đổi khung thì máy nén lại ở mức cao (đo trên bài giảng thật: VMAF 97/100), mất khoảng 1/5 thời lượng clip trên Mac Apple Silicon.
-5. **Nghiệm thu:** `ffprobe` kiểm dung lượng, thời lượng, khung hình từng clip (`--expect-size 1920x1080`).
+3. **Khung đầu ra:** 16:9, 9:16, 1:1, 4:5 hoặc kích thước tuỳ chỉnh. `--res auto` lên đúng một bậc chuẩn so với nguồn (720p → 1080p, phóng tối đa 1,8×); ép 2K/4K từ nguồn 720p sẽ bị cảnh báo vì chỉ làm file to, không nét hơn. Mặc định giữ trọn hình và bù nền đen; video dọc có thể dùng nền mờ.
+4. **Làm nét vừa phải (`--enhance`):** khử khối vỡ do nén, khử nhiễu, làm nét nhẹ; chữ trên bảng gọn hơn mà không bị vẽ lại. Muốn nét hơn nữa thì tài liệu skill giới thiệu công cụ AI cài thêm (Real-ESRGAN, Topaz Video…) kèm rủi ro; skill không có sẵn các công cụ này.
+5. **Chất lượng:** không đổi khung thì hình giữ nguyên từng điểm ảnh, cắt cả bài trong vài giây. Đổi khung thì máy nén lại ở mức cao (đo trên bài giảng thật: VMAF 97/100), mất khoảng 1/5 thời lượng clip trên Mac Apple Silicon (có làm nét: khoảng 1/3).
+6. **Nghiệm thu:** `ffprobe` kiểm dung lượng, thời lượng, khung hình từng clip (`--expect-size 1920x1080`).
 
 ---
 

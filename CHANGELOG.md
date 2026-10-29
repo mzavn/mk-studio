@@ -8,6 +8,19 @@ Mỗi bản có số dạng `X.Y.Z` (chung cho cả bộ skill):
 
 Cập nhật: `bash ~/.mk-studio/install.sh --update`.
 
+## Chưa phát hành
+
+Dự kiến: v0.5.0
+
+### mk-video-cutter
+
+**Mới**
+
+- **Làm nét vừa phải (`--enhance`).** Khử khối vỡ do nén và nhiễu trên hình gốc, rồi làm nét có kiểm soát sau khi phóng. Nét phấn, chữ trên bảng gọn hơn, không vẽ thêm chi tiết nên chữ viết tay, chữ Hán giữ nguyên hình. Chạy khoảng 1/3 thời lượng clip trên Apple Silicon.
+- **Tự chọn độ phân giải chuẩn (`--res auto`).** Lên đúng một bậc chuẩn so với video nguồn: 720p → 1080p (kể cả khi đã cắt viền Zoom dày), 1080p → 1440p, 480p → 720p; khung dọc và vuông tối đa 1080×1920 / 1080×1350 / 1080×1080 theo chuẩn Reels, TikTok, Shorts. Lệnh in từng bậc đã thử và lý do chọn. Bạn nói rõ độ phân giải thì skill dùng đúng số đó.
+- **Cảnh báo khi ép 2K/4K từ nguồn thấp.** `--res 2160` trên nguồn 720p báo "vượt mức vừa phải", nói rõ chỉ làm file to và lộ khối vỡ, gợi ý kích thước phù hợp.
+- Tài liệu skill giới thiệu các công cụ phóng to bằng AI cài thêm (Real-ESRGAN, Upscayl, Video2X, Topaz Video) cho ai muốn nét hơn nữa, kèm rủi ro (AI có thể vẽ lại sai chữ viết tay, chữ Hán) và cách thử an toàn. Skill không có sẵn và không tự cài các công cụ này.
+
 ## v0.4.0 — 29/10/2026
 
 ### mk-video-cutter
