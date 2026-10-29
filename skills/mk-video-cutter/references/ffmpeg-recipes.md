@@ -77,6 +77,13 @@ ffmpeg -ss [START] -to [END] -i input.mp4 \
 | `fill` | `scale=1920:1080:force_original_aspect_ratio=increase:…:flags=lanczos,crop=1920:1080,setsar=1` |
 | `blur` | `split[a][b];[a]scale=…increase,crop=…,boxblur=20:2[bg];[b]scale=…decrease…[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1` |
 
+`--enhance` thêm hai khúc vào chuỗi trên (vị trí có lý do):
+```text
+deblock=filter=strong:block=8,hqdn3d=1.5:1.5:3:3,crop=…,scale=…:flags=lanczos,cas=strength=0.6,pad=…
+```
+- `deblock` + `hqdn3d` đứng **trước** `crop`: khối nén 8×8 nằm theo lưới của khung gốc; cắt viền trước sẽ lệch lưới.
+- `cas` (làm nét theo độ tương phản) đứng **sau** `scale`, **trước** `pad`/nền mờ: làm nét đúng phần nội dung đã phóng, không đụng nền.
+
 Bộ mã hoá:
 ```bash
 -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -tag:v avc1 -movflags +faststart   # mặc định

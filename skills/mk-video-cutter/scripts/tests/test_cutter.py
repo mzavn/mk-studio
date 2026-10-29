@@ -336,6 +336,64 @@ class TestCutFrame(Base):
         out = self.ok("verify", out_dir, "--sheet", self.plan)
         self.assertIn("không clip nào khớp", out)
 
+    def test_lam_net_nhe_ma_hoa_lai_va_giu_khung(self):
+        out_dir = self.path("out")
+        dry = self.ok("cut", self.vid, "--sheet", self.plan, "--out-dir", out_dir, "--mode", "copy",
+                      "--crop", "320:180:40:40", "--enhance", "--dry-run")
+        self.assertIn("deblock", dry)
+        self.assertIn("cas=", dry)
+        self.assertNotIn("-c:v copy", dry)
+        self.ok("cut", self.vid, "--sheet", self.plan, "--prefix", "Buổi 9", "--out-dir", out_dir, "--mode", "copy",
+                "--crop", "320:180:40:40", "--enhance")
+        self.assertEqual(dims(os.path.join(out_dir, self.clip)), "320,180")
+
+
+@unittest.skipUnless(has_ffmpeg(), "cần ffmpeg")
+class TestResAuto(Base):
+    """Nguồn 720p: auto lên đúng một bậc chuẩn (1080p) ở mọi tỉ lệ khung, không lên 2K/4K."""
+
+    def setUp(self):
+        super().setUp()
+        self.vid = self.path("hd.mp4")
+        make_video(self.vid, "null", size="1280x720", seconds=4)
+
+    def output_of(self, *extra):
+        out = self.ok("frame", self.vid, "--crop", "none", "--res", "auto", *extra)
+        return [l for l in out.splitlines() if l.startswith("Đầu ra:")][0], out
+
+    def test_720p_ngang_len_1080p(self):
+        line, out = self.output_of("--aspect", "16:9")
+        self.assertIn("1920x1080", line)
+        self.assertIn("1440p (khung x2.00", out)
+
+    def test_720p_doc_9_16_len_1080x1920_khong_phinh_2k(self):
+        line, _ = self.output_of("--aspect", "9:16", "--fit", "blur")
+        self.assertIn("1080x1920", line)
+
+    def test_nguon_nho_khong_phong_qua_muc(self):
+        small = self.path("nho.mp4")
+        make_video(small, "null", size="320x180", seconds=4)
+        out = self.ok("frame", small, "--crop", "none", "--aspect", "16:9", "--res", "auto")
+        self.assertIn("Đầu ra: 320x180", out)  # 360p đã là x2.00 > x1.8 → giữ cỡ nguồn
+
+    def test_ep_len_4k_bi_canh_bao(self):
+        out = self.ok("frame", self.vid, "--crop", "none", "--aspect", "16:9", "--res", "2160")
+        self.assertIn("vượt mức vừa phải", out)
+        self.assertIn("chọn 1920x1080", out)
+
+    def test_720p_cat_vien_day_van_len_1080p(self):
+        # viền Zoom dày: nội dung còn 1040x582, vẫn là nguồn 720p → 1080p (nội dung phóng x1.85 ≤ x2.0)
+        out = self.ok("frame", self.vid, "--crop", "1040:582:120:70", "--aspect", "16:9", "--res", "auto")
+        self.assertIn("Đầu ra: 1920x1080", out)
+
+    def test_1080p_khung_doc_giu_1080x1920(self):
+        fhd = self.path("fhd.mp4")
+        make_video(fhd, "null", size="1920x1080", seconds=3)
+        out = self.ok("frame", fhd, "--crop", "none", "--aspect", "9:16", "--res", "auto", "--fit", "blur")
+        self.assertIn("Đầu ra: 1080x1920", out)  # chuẩn Reels/TikTok, không phình 1440x2560
+        out = self.ok("frame", fhd, "--crop", "none", "--aspect", "16:9", "--res", "auto")
+        self.assertIn("Đầu ra: 2560x1440", out)  # khung ngang: một bậc trên nguồn
+
 
 if __name__ == "__main__":
     unittest.main()

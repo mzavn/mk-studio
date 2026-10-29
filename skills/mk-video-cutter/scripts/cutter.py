@@ -2,17 +2,18 @@
 """Cắt nhỏ video bài giảng dài theo Action Sheet: viền thừa, khung hình, độ phân giải, cân bằng âm thanh.
 
   cutter.py probe VIDEO [--sample-time 00:15:00] [--duration 30]
-  cutter.py frame VIDEO [--sheet SHEET [--prefix P]] [--samples 12] [--preview DIR]
-                        [--crop auto|none|W:H:X:Y] [--aspect 16:9|9:16|W:H|source] [--res 1080|source] [--size WxH]
-                        [--fit pad|fill|blur]
+  cutter.py frame VIDEO [--sheet SHEET [--prefix P] [--only P1,P3]] [--samples 12] [--preview DIR]
+                        [--crop auto|none|W:H:X:Y] [--aspect 16:9|9:16|W:H|source] [--res auto|1080|source]
+                        [--size WxH] [--fit pad|fill|blur] [--enhance]
   cutter.py parse SHEET [--prefix "Buổi 1"]
-  cutter.py cut VIDEO --sheet SHEET --out-dir DIR [--prefix "Buổi 1"] [--mode auto|copy|balance|master]
+  cutter.py cut VIDEO --sheet SHEET --out-dir DIR [--prefix "Buổi 1"] [--only …] [--mode auto|copy|balance|master]
                       [--crop none|auto|W:H:X:Y] [--aspect …] [--res …] [--size WxH] [--fit pad|fill|blur]
-                      [--encoder x264|videotoolbox] [--crf 18] [--dry-run]
-  cutter.py verify DIR [--sheet SHEET] [--expect-size WxH]
+                      [--enhance] [--encoder x264|videotoolbox] [--crf 18] [--dry-run]
+  cutter.py verify DIR [--sheet SHEET [--prefix P]] [--expect-size WxH]
 
-Không có --crop/--aspect/--res/--size → hình giữ nguyên (stream copy). Có một trong số đó → hình được mã hoá lại
-(x264 CRF 18 mặc định). --fit pad (mặc định) giữ toàn bộ nội dung, thêm nền đen cho vừa khung.
+Không có --crop/--aspect/--res/--size/--enhance → hình giữ nguyên (stream copy). Có một trong số đó → hình được mã hoá
+lại (x264 CRF 18 mặc định). --fit pad (mặc định) giữ toàn bộ nội dung, thêm nền đen cho vừa khung. --res auto chọn chuẩn
+cao nhất mà nội dung không phải phóng quá 1,8×; --enhance khử khối nén + nhiễu và làm nét vừa phải.
 Thoát: 0 xong; 1 lỗi đầu vào/ffmpeg hoặc verify có clip lỗi. Chỉ thư viện chuẩn Python; cần ffmpeg/ffprobe trong PATH.
 """
 import argparse
@@ -485,37 +486,75 @@ def parse_ratio(text):
     return int(m.group(1)), int(m.group(2))
 
 
-def output_size(cw, ch, aspect, res, size):
+STANDARDS = (2160, 1440, 1080, 720, 480, 360)   # cạnh ngắn chuẩn: 4K, 2K, Full HD, HD, SD
+MAX_UPSCALE = 1.8    # khung đầu ra so với khung nguồn (cạnh ngắn): 720p → 1080p = ×1,5; 720p → 1440p = ×2,0 là quá
+MAX_CONTENT = 2.0    # nội dung sau cắt viền phóng tối đa: viền Zoom dày (nội dung ~580 px) → 1080 = ×1,86 vẫn được
+PORTRAIT_MAX = 1080  # khung dọc/vuông: chuẩn Reels/TikTok/Shorts 1080×1920, 1080×1350, 1080×1080
+ENHANCE_PRE = "deblock=filter=strong:block=8,hqdn3d=1.5:1.5:3:3"   # trên khung gốc: lưới khối nén 8×8 còn thẳng
+ENHANCE_POST = "cas=strength=0.6"   # sau khi phóng: làm nét có kiểm soát, không bịa chi tiết
+
+
+def fit_scale(cw, ch, W, H, fit):
+    return max(W / cw, H / ch) if fit == "fill" else min(W / cw, H / ch)
+
+
+def upscale_of(src, cw, ch, W, H, fit):
+    """→ (khung, nội dung): khung đầu ra lớn hơn khung nguồn bao nhiêu (cạnh ngắn so cạnh ngắn — "720p → 1080p" = ×1,5),
+    và nội dung sau cắt viền bị phóng bao nhiêu."""
+    return min(W, H) / min(src), fit_scale(cw, ch, W, H, fit)
+
+
+def too_big(k):
+    return k[0] > MAX_UPSCALE + 1e-9 or k[1] > MAX_CONTENT + 1e-9
+
+
+def output_size(src, cw, ch, aspect, res, size, fit="pad", trail=None):
+    """→ (W, H). src = (w, h) khung nguồn. res auto: thử chuẩn từ cao xuống, lấy chuẩn đầu tiên không quá mức — tức một
+    bậc chuẩn trên nguồn (720p → 1080p, 1080p → 1440p, 480p → 720p); khung dọc/vuông tối đa 1080 cạnh ngắn.
+    trail (list) nhận từng bước thử để in lý do chọn."""
     if size:
         sw, sh = parse_ratio(size)
         return even(sw), even(sh)
     aw, ah = parse_ratio(aspect) if aspect and aspect != "source" else (cw, ch)
+
+    def dims(short):
+        return (even(short * aw / ah + 1), even(short)) if aw > ah else (even(short), even(short * ah / aw + 1))
+
+    if res == "auto":
+        for s in STANDARDS:
+            if aw <= ah and s > PORTRAIT_MAX:
+                continue
+            k = upscale_of(src, cw, ch, *dims(s), fit)
+            if trail is not None:
+                trail.append("%dp (khung x%.2f, nội dung x%.2f) %s" % (s, k[0], k[1], "quá" if too_big(k) else "✓"))
+            if not too_big(k):
+                return dims(s)
+        res = "source"
     if res == "source":
-        short = min(cw, ch) if (aw >= ah) == (cw >= ch) else max(cw, ch) * min(aw, ah) // max(aw, ah)
-    else:
-        if not str(res).isdigit() or int(res) < 2:
-            die("--res cần số điểm ảnh cạnh ngắn (vd 1080) hoặc 'source'; nhận: %s" % res)
-        short = int(res)
-    if aw >= ah:
-        return even(short * aw / ah + 1), even(short)
-    return even(short), even(short * ah / aw + 1)
+        return dims(min(cw, ch) if (aw >= ah) == (cw >= ch) else max(cw, ch) * min(aw, ah) // max(aw, ah))
+    if not str(res).isdigit() or int(res) < 2:
+        die("--res cần số điểm ảnh cạnh ngắn (vd 1080), 'auto' hoặc 'source'; nhận: %s" % res)
+    return dims(int(res))
 
 
-def video_filter(rect, out, fit):
-    """Một chuỗi lọc dùng chung cho ảnh xem trước và lệnh cắt — xem trước thế nào, ra video thế ấy."""
-    head = "crop=%d:%d:%d:%d" % (rect["w"], rect["h"], rect["x"], rect["y"]) if rect else ""
+def video_filter(rect, out, fit, enhance=False):
+    """Một chuỗi lọc dùng chung cho ảnh xem trước và lệnh cắt — xem trước thế nào, ra video thế ấy.
+    enhance: khử khối nén + khử nhiễu trên khung gốc, làm nét nhẹ sau khi phóng (không phủ lên nền đen/nền mờ)."""
+    parts = ([ENHANCE_PRE] if enhance else []) + (
+        ["crop=%d:%d:%d:%d" % (rect["w"], rect["h"], rect["x"], rect["y"])] if rect else [])
+    sharpen = "," + ENHANCE_POST if enhance else ""
     if not out:
-        return head
+        return ",".join(parts) + sharpen if parts else ""
     W, H = out
     fitted = "scale=%d:%d:force_original_aspect_ratio=%%s:force_divisible_by=2:flags=lanczos" % (W, H)
     if fit == "fill":
-        tail = (fitted % "increase") + ",crop=%d:%d,setsar=1" % (W, H)
+        tail = (fitted % "increase") + ",crop=%d:%d" % (W, H) + sharpen + ",setsar=1"
     elif fit == "blur":
         tail = ("split[a][b];[a]scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,boxblur=20:2[bg];"
-                "[b]%s[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1" % (W, H, W, H, fitted % "decrease"))
+                "[b]%s%s[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1" % (W, H, W, H, fitted % "decrease", sharpen))
     else:
-        tail = (fitted % "decrease") + ",pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1" % (W, H)
-    return head + "," + tail if head else tail
+        tail = (fitted % "decrease") + sharpen + ",pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1" % (W, H)
+    return ",".join(parts + [tail])
 
 
 def frame_plan(args, video, w, h, keep, crop_default):
@@ -541,29 +580,41 @@ def frame_plan(args, video, w, h, keep, crop_default):
         rect = parse_crop(crop, w, h)
         print("Khung nội dung (nhập tay): %dx%d tại %d,%d" % (rect["w"], rect["h"], rect["x"], rect["y"]))
     cw, ch = (rect["w"], rect["h"]) if rect else (w, h)
-    out = None
+    out, trail = None, []
     if args.aspect or args.res or args.size:
-        out = output_size(cw, ch, args.aspect, args.res or "source", args.size)
+        out = output_size((w, h), cw, ch, args.aspect, args.res or "source", args.size, args.fit, trail)
     if out:
         W, H = out
         rc, rt = cw / ch, W / H
         lost = 1 - min(rc, rt) / max(rc, rt)
-        scale = min(W / cw, H / ch) if args.fit != "fill" else max(W / cw, H / ch)
+        k = upscale_of((w, h), cw, ch, W, H, args.fit)
         how = {"pad": "giữ toàn bộ nội dung, nền đen", "fill": "phủ kín khung, cắt bớt mép nội dung",
                "blur": "giữ toàn bộ nội dung, nền mờ"}[args.fit]
-        print("Đầu ra: %dx%d (%s) · nội dung %dx%d · tỉ lệ nội dung %.2f, khung %.2f · phóng x%.2f" % (
-            W, H, how, cw, ch, rc, rt, scale))
+        print("Đầu ra: %dx%d (%s) · nội dung %dx%d · tỉ lệ nội dung %.2f, khung %.2f · khung x%.2f so với nguồn, "
+              "nội dung phóng x%.2f" % (W, H, how, cw, ch, rc, rt, k[0], k[1]))
+        if trail:
+            print("Chuẩn tự chọn (--res auto: một bậc trên nguồn, khung ≤ x%.1f, nội dung ≤ x%.1f%s): %s" % (
+                MAX_UPSCALE, MAX_CONTENT, ", khung dọc/vuông ≤ %d" % PORTRAIT_MAX if W <= H else "",
+                " · ".join(trail)))
         if lost > 0.005:
             print("%s: %s %.0f%% khung" % (
                 "Cảnh báo" if args.fit == "fill" else "Ghi chú",
                 "fill cắt mất mép nội dung, khoảng" if args.fit == "fill" else
                 ("nền đen" if args.fit == "pad" else "nền mờ") + " chiếm khoảng", lost * 100))
-        if scale > 1.01:
-            print("Cảnh báo: phóng to x%.2f không tạo thêm chi tiết thật — hình đạt khung chuẩn %dx%d, độ nét "
-                  "không vượt bản gốc" % (scale, W, H))
+        if too_big(k):
+            print("Cảnh báo: khung x%.2f / nội dung x%.2f vượt mức vừa phải (khung ≤ x%.1f như 720p → 1080p, nội dung "
+                  "≤ x%.1f). Nguồn %dx%d lên %dx%d chỉ làm file to hơn và lộ khối vỡ, không nét hơn — dùng --res auto "
+                  "(chọn %dx%d)" % (k[0], k[1], MAX_UPSCALE, MAX_CONTENT, w, h, W, H,
+                                    *output_size((w, h), cw, ch, args.aspect, "auto", None, args.fit)))
+        elif k[1] > 1.01:
+            print("Ghi chú: nội dung phóng x%.2f (vừa phải) — hình đạt khung chuẩn %dx%d, độ nét không vượt bản gốc%s" % (
+                k[1], W, H, "" if args.enhance else "; thêm --enhance để làm sạch và làm nét nhẹ"))
     elif rect:
         print("Đầu ra: %dx%d (chỉ cắt viền, không đổi cỡ)" % (cw, ch))
-    vf = video_filter(rect, out, args.fit) if (rect or out) else ""
+    if args.enhance:
+        print("Làm nét nhẹ: khử khối nén + khử nhiễu trên hình gốc, làm nét vừa phải sau khi phóng (không tạo chi tiết "
+              "mới, không đổi nét chữ)")
+    vf = video_filter(rect, out, args.fit, args.enhance) if (rect or out or args.enhance) else ""
     return rect, out, vf, dark, used
 
 
@@ -620,7 +671,7 @@ def write_previews(video, h, rect, vf, used, dark, keep, out_dir):
 
 
 def wants_frame(args):
-    return bool((args.crop and args.crop != "none") or args.aspect or args.res or args.size)
+    return bool((args.crop and args.crop != "none") or args.aspect or args.res or args.size or args.enhance)
 
 
 def encoder_args(args):
@@ -846,7 +897,9 @@ def main(argv=None):
     frame_opts = argparse.ArgumentParser(add_help=False)
     frame_opts.add_argument("--crop", help="auto | none | W:H:X:Y")
     frame_opts.add_argument("--aspect", help="16:9 | 9:16 | 1:1 | 4:5 | W:H | source")
-    frame_opts.add_argument("--res", help="cạnh ngắn đầu ra, vd 1080; hoặc source")
+    frame_opts.add_argument("--res", help="cạnh ngắn đầu ra: auto (chuẩn phù hợp nguồn) | 1080 | 720 … | source")
+    frame_opts.add_argument("--enhance", action="store_true",
+                            help="làm sạch khối nén + nhiễu, làm nét vừa phải (mã hoá lại hình)")
     frame_opts.add_argument("--size", help="kích thước tuỳ chỉnh WxH, vd 1080x1350")
     frame_opts.add_argument("--fit", choices=["pad", "fill", "blur"], default="pad")
     frame_opts.add_argument("--samples", type=int, default=12)

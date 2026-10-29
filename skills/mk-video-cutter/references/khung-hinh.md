@@ -50,13 +50,15 @@ Mẫu rải đều theo thời gian, nên bố cục lạ chỉ kéo dài vài p
 | Cờ | Ý nghĩa |
 |---|---|
 | `--aspect 16:9` / `9:16` / `1:1` / `4:5` / `W:H` | tỉ lệ khung; `source` = theo tỉ lệ nội dung |
+| `--res auto` (khuyên dùng) | chuẩn cao nhất mà nội dung **và** khung không phải phóng quá 1,8× — tức một bậc chuẩn trên nguồn (§6) |
 | `--res 1080` | cạnh ngắn = 1080 (16:9 → 1920×1080, 9:16 → 1080×1920, 4:5 → 1080×1350); `source` = không phóng to |
+| `--enhance` | khử khối nén + khử nhiễu trên hình gốc, làm nét vừa phải sau khi phóng (§6) |
 | `--size WxH` | kích thước cụ thể, bỏ qua `--aspect/--res` |
 | `--fit pad` (mặc định) | giữ trọn nội dung, bù nền đen |
 | `--fit blur` | giữ trọn nội dung, nền là chính hình đó phóng to làm mờ — hợp video dọc |
 | `--fit fill` | phủ kín khung, **cắt mép nội dung** (in % bị mất) — chỉ khi người dùng chọn |
 
-Không có `--crop/--aspect/--res/--size` → hình giữ nguyên bằng stream copy (âm thanh vẫn theo `--mode`).
+Không có `--crop/--aspect/--res/--size/--enhance` → hình giữ nguyên bằng stream copy (âm thanh vẫn theo `--mode`).
 
 ## 5. Chất lượng khi đổi khung (đo trên bài giảng thật 720p, 60 giây, Mac Apple Silicon)
 
@@ -66,3 +68,48 @@ Không có `--crop/--aspect/--res/--size` → hình giữ nguyên bằng stream 
 | VideoToolbox q65 (`--encoder videotoolbox`) | ~12× | ~3,3 Mbps | 93,6 |
 
 VMAF ≥ 95 thường được coi là khó phân biệt bằng mắt. Phóng 720p lên 1080p dùng lanczos: chữ mịn hơn phóng thường, nhưng chi tiết không vượt bản gốc. Lợi ích thật: đạt khung chuẩn để nền tảng xếp video vào mức 1080p.
+
+## 6. Chọn chuẩn phù hợp và làm nét vừa phải
+
+Phóng to không thêm chi tiết; chỉ nên lên **một bậc chuẩn** so với khung nguồn. `--res auto` thử từ cao xuống, in từng bậc (khung ×, nội dung ×), lấy bậc đầu tiên đạt cả hai:
+- **khung đầu ra ≤ 1,8× khung nguồn** (cạnh ngắn với cạnh ngắn): 720p → 1080p = ×1,5; 720p → 1440p = ×2,0 là quá;
+- **nội dung sau cắt viền phóng ≤ 2,0×**: cho phép viền Zoom dày vẫn lên 1080p, chặn trường hợp phóng một mảnh nhỏ;
+- **khung dọc/vuông** (9:16, 4:5, 1:1) tối đa 1080 cạnh ngắn — chuẩn Reels/TikTok/Shorts.
+
+| Nguồn → nội dung sau cắt viền | `auto` chọn (16:9) | `auto` chọn (9:16) |
+|---|---|---|
+| 720p, đầy khung 1280×720 | 1920×1080 (khung ×1,5) | 1080×1920 |
+| 720p, cắt viền Zoom còn ~1110×624 | 1920×1080 (nội dung ×1,73) | 1080×1920 |
+| 720p, viền dày còn ~1040×582 | 1920×1080 (nội dung ×1,85) | 1080×1920 |
+| 1080p | 2560×1440 (khung ×1,33) | 1080×1920 (trần khung dọc) |
+| 480p | 1280×720 (khung ×1,5) | 720×1280 |
+| 720p nhưng chỉ lấy một mảnh 356×200 | 640×360 (nội dung ×1,8) | 480×854 |
+
+Người dùng nói rõ độ phân giải ("xuất 1080p", "làm bản 4K") → dùng `--res N` đúng ý họ; `auto` chỉ khi họ không nói. Script in `Cảnh báo: khung xA / nội dung xB vượt mức vừa phải … (chọn WxH)` khi số đó quá mức (vd ép 2160 từ nguồn 720p, hoặc 4K từ nguồn 1080p = ×2,0): nói thật là file to hơn, lộ khối vỡ, không nét hơn, đề xuất kích thước trong dòng đó. Người dùng vẫn giữ ý → cắt theo ý họ, ghi cảnh báo vào báo cáo; script không chặn.
+
+`--enhance` (chuỗi lọc: `references/ffmpeg-recipes.md` §4):
+- Khử khối 8×8 của bản nén và nhiễu nhẹ **trước** khi cắt viền (lưới khối còn thẳng hàng), làm nét có kiểm soát (`cas` 0,6) **sau** khi phóng, không phủ lên nền đen/nền mờ.
+- Đo trên bài giảng 720p thật (bảng phấn, quay Zoom): độ nét vùng chữ tăng ~14%, nhiễu vùng bảng trống gần như không đổi (3,85 → 3,89); không thấy viền trắng quanh nét. 20 giây video xử lý trong 6,6 giây.
+- Giới hạn: nguồn **nhiễu hạt nặng** (quay thiếu sáng, camera rẻ) thì bước làm nét làm hạt rõ hơn và file nặng hơn — xem `khung-dau-ra.png` trước; hạt lộ rõ → bỏ `--enhance`.
+- Không tạo chi tiết mới, không đổi hình chữ — an toàn với chữ viết tay, chữ Hán trên bảng.
+
+## 7. Muốn nét hơn mức này: công cụ AI cài thêm (ngoài skill)
+
+Skill **không có sẵn** và **không tự cài** các công cụ dưới đây. Chỉ giới thiệu khi người dùng muốn nét hơn `--enhance`, kèm rủi ro, để họ tự quyết.
+
+| Công cụ | Trên máy Mac | Ghi chú |
+|---|---|---|
+| Real-ESRGAN (ncnn-vulkan), miễn phí | bản chạy sẵn tải từ trang Releases của dự án | làm từng ảnh: tách video ra ảnh → phóng → ghép lại bằng ffmpeg; video 2 giờ là hàng trăm nghìn ảnh, cần **hàng trăm GB** ổ trống và nhiều giờ máy |
+| Upscayl, miễn phí | `brew install --cask upscayl` | phóng **ảnh** (thumbnail, ảnh chụp bảng), không xử lý cả video |
+| Video2X, miễn phí | chưa có bản chính thức cho macOS (Windows, Linux); có bản dựng cộng đồng chưa kiểm chứng | dùng trên máy Windows/Linux của chính người dùng |
+| Topaz Video, trả phí | chạy trên Mac Apple Silicon (không hỗ trợ Mac Intel), xem yêu cầu hệ thống trước khi mua | có mẫu xử lý theo thời gian, ít nhấp nháy hơn mẫu từng ảnh; một số mẫu chạy qua máy chủ của hãng |
+
+Rủi ro phải nói trước khi người dùng chọn AI:
+- AI **vẽ thêm** chi tiết theo những gì nó đã học: chữ viết tay, chữ Hán trên bảng có thể bị đổi nét — với bài giảng là sai nội dung.
+- Mặt người dễ mịn như sáp; mẫu xử lý từng ảnh dễ nhấp nháy giữa các khung.
+- Video 2–3 giờ có hàng trăm nghìn khung hình: có thể tốn hàng chục giờ máy.
+- Công cụ/mẫu chạy trên máy chủ ngoài hay dịch vụ online = **gửi video ra ngoài**: nói rõ điều này, người dùng tự quyết (agent không tải video lên đâu).
+
+Cách thử an toàn: dùng chính skill cắt một mẫu 30–60 giây có chữ trên bảng và mặt người (PLAN một dòng `KEEP` + `END`, hoặc `--only` một đoạn ngắn), xuất 3 bản cạnh nhau (gốc / `--enhance` / AI), người dùng xem chữ trên bảng rồi mới quyết chạy cả buổi. Luôn giữ file gốc.
+
+Nguồn: [Real-ESRGAN Releases](https://github.com/xinntao/Real-ESRGAN/releases) · [Upscayl](https://upscayl.org/) · [Video2X — hỗ trợ macOS (issue #1189)](https://github.com/k4yt3x/video2x/issues/1189) · [Topaz Video — yêu cầu hệ thống](https://docs.topazlabs.com/topaz-video/system-requirements).
