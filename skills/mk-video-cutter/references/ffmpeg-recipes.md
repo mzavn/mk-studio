@@ -67,17 +67,20 @@ ffmpeg -ss [START] -to [END] -i input.mp4 \
 
 ---
 
-## 4. Tăng Tốc Phần Cứng (Hardware Acceleration)
+## 4. Đổi Khung Hình (Cắt Viền, Tỉ Lệ, 1080p)
 
-Khi bắt buộc phải re-encode lại video (ví dụ cần cắt chính xác từng frame không phụ thuộc keyframe, hoặc chèn watermark/bộ lọc hình):
+Đổi khung bắt buộc mã hoá lại hình; `cutter.py` dựng chuỗi lọc từ `--crop/--aspect/--res/--size/--fit` (cách chọn: `references/khung-hinh.md`). Ví dụ (dữ liệu giả) nội dung 1110×622 tại (80,58) → 1920×1080:
 
-- **macOS Apple Silicon (M1/M2/M3/M4):**
-  Dùng VideoToolbox encoder:
-  ```bash
-  -c:v h264_videotoolbox -b:v 1500k
-  ```
-- **Linux / Windows với GPU NVIDIA:**
-  Dùng NVENC encoder:
-  ```bash
-  -c:v h264_nvenc -b:v 1500k
-  ```
+| `--fit` | Chuỗi lọc sau `crop=1110:622:80:58,` |
+|---|---|
+| `pad` | `scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1` |
+| `fill` | `scale=1920:1080:force_original_aspect_ratio=increase:…:flags=lanczos,crop=1920:1080,setsar=1` |
+| `blur` | `split[a][b];[a]scale=…increase,crop=…,boxblur=20:2[bg];[b]scale=…decrease…[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1` |
+
+Bộ mã hoá:
+```bash
+-c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -tag:v avc1 -movflags +faststart   # mặc định
+-c:v h264_videotoolbox -q:v 65 -pix_fmt yuv420p -tag:v avc1                               # --encoder videotoolbox (macOS)
+```
+- `-ss`/`-to` đặt trước `-i`: khi mã hoá lại, ffmpeg cắt chính xác tới khung hình (không phụ thuộc keyframe như stream copy).
+- Số đo tốc độ và chất lượng: `references/khung-hinh.md` §5.

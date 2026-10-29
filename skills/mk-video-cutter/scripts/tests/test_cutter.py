@@ -171,5 +171,171 @@ class TestVerify(Base):
         self.assertIn("HỢP LỆ", out)
 
 
+
+def has_ffmpeg():
+    return subprocess.run(["which", "ffmpeg"], capture_output=True).returncode == 0
+
+
+def make_video(path, vf, size="320x180", src="testsrc2", seconds=12):
+    """Video giả: nội dung chuyển động (testsrc2 + nhiễu theo thời gian, như người giảng cử động) hoặc đứng yên
+    (color), có thể bọc viền tĩnh bằng pad."""
+    source = "%s%ssize=%s:rate=5:duration=%d" % (src, ":" if "=" in src else "=", size, seconds)
+    chain = vf if src.startswith("color") else "noise=alls=30:allf=t," + vf
+    subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", source,
+                    "-f", "lavfi", "-i", "sine=frequency=500:duration=%d" % seconds, "-vf", chain,
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", path],
+                   capture_output=True, check=True)
+
+
+def dims(path):
+    res = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+                          "-of", "csv=p=0", path], capture_output=True, text=True)
+    return res.stdout.strip()
+
+
+PLAN_12S = "00:00:00 | KEEP | P1 | Thử Khung | x\n00:00:12 | END\n"
+# Nội dung 320x180 chuyển động, bọc viền tĩnh xám kiểu thanh Zoom: trên 40, dưới 40, trái 40, phải 40 → khung 400x260
+ZOOM_LIKE = "pad=400:260:40:40:color=0x303030"
+
+
+def make_layout_change(path):
+    """32 giây kiểu Zoom: thanh xám trên/dưới 40 px; nội dung hẹp (dải đen 80 px hai bên), riêng 13–19 giây đổi sang
+    bố cục rộng (dải đen 40 px) — như Zoom chuyển chế độ xem giữa đoạn P2."""
+    graph = ("[0:v]noise=alls=30:allf=t,split[a][b];[a]crop=320:220,pad=480:300:80:40:color=black[n];"
+             "[b]pad=480:300:40:40:color=black[w];[n][w]overlay=enable='between(t,13,19)',"
+             "drawbox=0:0:480:40:color=0x303030:t=fill,drawbox=0:260:480:40:color=0x303030:t=fill[v]")
+    subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc2=size=400x220:rate=5:duration=32",
+                    "-f", "lavfi", "-i", "sine=frequency=500:duration=32", "-filter_complex", graph,
+                    "-map", "[v]", "-map", "1:a", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", path],
+                   capture_output=True, check=True)
+
+
+PLAN_3 = ("00:00:00 | KEEP | P1 | Mở Đầu | x\n00:00:10 | KEEP | P2 | Chia Màn Hình | x\n"
+          "00:00:22 | KEEP | P3 | Hỏi Đáp | x\n00:00:32 | END\n")
+
+
+@unittest.skipUnless(has_ffmpeg(), "cần ffmpeg")
+class TestFrame(Base):
+    def crop_of(self, out):
+        line = [l for l in out.splitlines() if "--crop" in l][0]
+        return [int(v) for v in line.rsplit("--crop ", 1)[1].split(":")]
+
+    def test_phat_hien_vien_tinh_va_giu_tron_noi_dung(self):
+        vid = self.path("zoom.mp4")
+        make_video(vid, ZOOM_LIKE)
+        out = self.ok("frame", vid)
+        self.assertIn("Viền thừa: có", out)
+        w, h, x, y = self.crop_of(out)
+        # khung đề xuất bám sát vùng nội dung 320x180 tại (40,40), sai số ≤ 4 px, không lấn ra viền quá 4 px
+        for got, want in ((w, 320), (h, 180), (x, 40), (y, 40)):
+            self.assertLessEqual(abs(got - want), 4, out)
+        self.assertTrue(w % 2 == 0 and h % 2 == 0 and x % 2 == 0 and y % 2 == 0, "toạ độ crop phải chẵn")
+
+    def test_video_khong_vien_giu_nguyen_khung(self):
+        vid = self.path("clean.mp4")
+        make_video(vid, "null")
+        out = self.ok("frame", vid)
+        self.assertIn("Viền thừa: không có", out)
+        self.assertNotIn("--crop", out)
+
+    def test_hinh_dung_yen_khong_ket_luan_va_khong_cat(self):
+        vid = self.path("still.mp4")
+        make_video(vid, "null", src="color=c=gray")
+        out = self.ok("frame", vid, "--aspect", "16:9", "--res", "180")
+        self.assertIn("không kết luận được", out)
+        self.assertNotIn("crop=", out)
+
+    def test_preview_ghi_hai_anh_va_khong_ghi_de(self):
+        vid = self.path("zoom.mp4")
+        make_video(vid, ZOOM_LIKE)
+        prev = self.path("xem-truoc")
+        self.ok("frame", vid, "--aspect", "16:9", "--res", "360", "--preview", prev)
+        self.assertEqual(dims(os.path.join(prev, "khung-dau-ra.png")), "640,360")
+        self.assertTrue(os.path.getsize(os.path.join(prev, "khung-phat-hien.png")) > 0)
+        err = self.fail("frame", vid, "--preview", prev)
+        self.assertIn("không ghi đè", err)
+
+    def test_crop_ngoai_khung_bi_tu_choi(self):
+        vid = self.path("zoom.mp4")
+        make_video(vid, ZOOM_LIKE, seconds=6)
+        err = self.fail("frame", vid, "--crop", "400:260:10:0")
+        self.assertIn("nằm ngoài khung", err)
+
+    def test_only_ma_khong_co_bao_loi(self):
+        vid = self.path("zoom.mp4")
+        make_video(vid, ZOOM_LIKE, seconds=6)
+        err = self.fail("frame", vid, "--sheet", self.path("plan.txt", PLAN_12S), "--only", "P9")
+        self.assertIn("không có đoạn KEEP mã P9", err)
+
+    def test_bo_cuc_doi_chi_dung_doan_va_anh_co_ca_hai_bo_cuc(self):
+        vid = self.path("doi.mp4")
+        make_layout_change(vid)
+        prev = self.path("xem")
+        out = self.ok("frame", vid, "--sheet", self.path("plan.txt", PLAN_3), "--preview", prev)
+        warn = [l for l in out.splitlines() if l.startswith("Cảnh báo: bố cục đổi")][0]
+        self.assertRegex(warn, r"rộng \(dùng hết khung\) [^;]*· đoạn P2\.")
+        self.assertIn("→ Tách khung: chạy riêng --only P1,P3 và --only P2", out)
+        # ảnh 4 mẫu phải có cả hai bố cục để người dùng thấy dải đen sẽ còn ở đâu
+        self.assertIn("(bố cục hẹp)", out)
+        self.assertIn("(bố cục rộng)", out)
+        self.assertIn("bố cục đa số", out)
+
+    def test_only_rong_bi_tu_choi(self):
+        vid = self.path("zoom.mp4")
+        make_video(vid, ZOOM_LIKE, seconds=6)
+        err = self.fail("frame", vid, "--sheet", self.path("plan.txt", PLAN_12S), "--only", ",")
+        self.assertIn("cần ít nhất một mã", err)
+
+
+@unittest.skipUnless(has_ffmpeg(), "cần ffmpeg")
+class TestCutFrame(Base):
+    def setUp(self):
+        super().setUp()
+        self.vid = self.path("zoom.mp4")
+        make_video(self.vid, ZOOM_LIKE)
+        self.plan = self.path("plan.txt", PLAN_12S)
+        self.clip = "Buổi 9-P1 - Thử Khung.mp4"
+
+    def test_cat_vien_nang_16_9_nen_den(self):
+        out_dir = self.path("out")
+        self.ok("cut", self.vid, "--sheet", self.plan, "--prefix", "Buổi 9", "--out-dir", out_dir, "--mode", "copy",
+                "--crop", "320:180:40:40", "--aspect", "16:9", "--res", "360")
+        self.assertEqual(dims(os.path.join(out_dir, self.clip)), "640,360")
+        out = self.ok("verify", out_dir, "--expect-size", "640x360")
+        self.assertIn("640x360", out)
+
+    def test_khung_doc_9_16_nen_mo(self):
+        out_dir = self.path("out")
+        self.ok("cut", self.vid, "--sheet", self.plan, "--prefix", "Buổi 9", "--out-dir", out_dir, "--mode", "copy",
+                "--crop", "320:180:40:40", "--aspect", "9:16", "--res", "180", "--fit", "blur")
+        self.assertEqual(dims(os.path.join(out_dir, self.clip)), "180,320")
+
+    def test_kich_thuoc_tuy_chinh(self):
+        out_dir = self.path("out")
+        self.ok("cut", self.vid, "--sheet", self.plan, "--prefix", "Buổi 9", "--out-dir", out_dir, "--mode", "copy",
+                "--size", "200x250")
+        self.assertEqual(dims(os.path.join(out_dir, self.clip)), "200,250")
+
+    def test_khong_tuy_chon_khung_thi_giu_nguyen_hinh(self):
+        out = self.ok("cut", self.vid, "--sheet", self.plan, "--out-dir", self.path("out"), "--mode", "copy",
+                      "--dry-run")
+        self.assertIn("-c:v copy", out)
+        self.assertNotIn("-vf", out)
+
+    def test_verify_sai_khung_bao_loi(self):
+        out_dir = self.path("out")
+        self.ok("cut", self.vid, "--sheet", self.plan, "--prefix", "Buổi 9", "--out-dir", out_dir, "--mode", "copy")
+        out = self.fail("verify", out_dir, "--expect-size", "1920x1080")
+        self.assertIn("LỖI: KHUNG 400x260 ≠ 1920x1080", out)
+
+    def test_verify_doi_chieu_ten_co_prefix(self):
+        out_dir = self.path("out")
+        self.ok("cut", self.vid, "--sheet", self.plan, "--prefix", "Buổi 9", "--out-dir", out_dir, "--mode", "copy")
+        out = self.ok("verify", out_dir, "--sheet", self.plan, "--prefix", "Buổi 9")
+        self.assertNotIn("không clip nào khớp", out)
+        out = self.ok("verify", out_dir, "--sheet", self.plan)
+        self.assertIn("không clip nào khớp", out)
+
+
 if __name__ == "__main__":
     unittest.main()

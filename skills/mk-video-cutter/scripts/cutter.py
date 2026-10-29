@@ -1,17 +1,26 @@
 #!/usr/bin/env python3
-"""Cắt nhỏ video bài giảng dài theo Action Sheet và tự động cân bằng âm thanh.
+"""Cắt nhỏ video bài giảng dài theo Action Sheet: viền thừa, khung hình, độ phân giải, cân bằng âm thanh.
 
   cutter.py probe VIDEO [--sample-time 00:15:00] [--duration 30]
+  cutter.py frame VIDEO [--sheet SHEET [--prefix P]] [--samples 12] [--preview DIR]
+                        [--crop auto|none|W:H:X:Y] [--aspect 16:9|9:16|W:H|source] [--res 1080|source] [--size WxH]
+                        [--fit pad|fill|blur]
   cutter.py parse SHEET [--prefix "Buổi 1"]
-  cutter.py cut VIDEO --sheet SHEET --out-dir DIR [--prefix "Buổi 1"] [--mode auto|copy|balance|master] [--dry-run]
-  cutter.py verify DIR [--sheet SHEET]
+  cutter.py cut VIDEO --sheet SHEET --out-dir DIR [--prefix "Buổi 1"] [--mode auto|copy|balance|master]
+                      [--crop none|auto|W:H:X:Y] [--aspect …] [--res …] [--size WxH] [--fit pad|fill|blur]
+                      [--encoder x264|videotoolbox] [--crf 18] [--dry-run]
+  cutter.py verify DIR [--sheet SHEET] [--expect-size WxH]
 
-Chỉ dùng thư viện chuẩn Python (Standard Library). Yêu cầu ffmpeg/ffprobe trong PATH.
+Không có --crop/--aspect/--res/--size → hình giữ nguyên (stream copy). Có một trong số đó → hình được mã hoá lại
+(x264 CRF 18 mặc định). --fit pad (mặc định) giữ toàn bộ nội dung, thêm nền đen cho vừa khung.
+Thoát: 0 xong; 1 lỗi đầu vào/ffmpeg hoặc verify có clip lỗi. Chỉ thư viện chuẩn Python; cần ffmpeg/ffprobe trong PATH.
 """
 import argparse
+import shlex
 import csv
 import json
 import os
+import math
 import re
 import shutil
 import subprocess
@@ -61,6 +70,12 @@ def dur(ms):
 def safe_filename(name):
     clean = FORBIDDEN.sub("-", name).replace(":", "-")
     return re.sub(r"\s+", " ", clean).strip(" .")
+
+
+def refuse(*paths):
+    for p in paths:
+        if p and os.path.lexists(p):
+            die("%s đã có — xoá file hoặc đổi tên (không ghi đè)" % p)
 
 
 def check_tools(*names):
@@ -274,6 +289,365 @@ def probe_audio(video, sample_time="00:15:00", duration=30):
     }
 
 
+# ---------------------------------------------------------------- Khung hình (viền thừa, tỉ lệ, độ phân giải)
+
+ACTIVE_DELTA = 12      # một điểm ảnh "có chuyển động" khi độ sáng giữa các mẫu chênh hơn mức này (0–255)
+ACTIVE_ROW = 0.5       # hàng/cột thuộc nội dung khi ≥ 50% điểm ảnh của nó có chuyển động
+MAX_BAND = 0.3         # viền mỗi phía tối đa 30% kích thước, quá mức → không kết luận
+
+
+def video_info(video):
+    check_tools("ffprobe")
+    res = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                          "stream=width,height:format=duration", "-of", "json", video],
+                         capture_output=True, text=True)
+    try:
+        data = json.loads(res.stdout)
+        st = data["streams"][0]
+        return int(st["width"]), int(st["height"]), int(float(data["format"]["duration"]) * 1000)
+    except (ValueError, KeyError, IndexError):
+        die("không đọc được khung hình từ %s" % video)
+
+
+def even(n):
+    return max(2, int(n) // 2 * 2)
+
+
+def short_tc(ms):
+    s = ms // 1000
+    return "%d:%02d:%02d" % (s // 3600, s // 60 % 60, s % 60) if s >= 3600 else "%02d:%02d" % (s // 60, s % 60)
+
+
+def segment_of(keep, t):
+    for s in keep or []:
+        if s["start"] <= t < s["end"]:
+            return s["code"]
+    return "?"
+
+
+def select_only(keep, only):
+    """--only "P1,P5.2" → chỉ giữ các đoạn KEEP có mã đó; mã không có → lỗi (không lặng lẽ bỏ qua)."""
+    if not only:
+        return keep
+    want = [c.strip() for c in only.split(",") if c.strip()]
+    if not want:
+        die("--only cần ít nhất một mã đoạn KEEP, vd --only P1,P3")
+    missing = [c for c in want if c not in {s["code"] for s in keep}]
+    if missing:
+        die("--only: không có đoạn KEEP mã %s (có: %s)" % (", ".join(missing), ", ".join(s["code"] for s in keep)))
+    return [s for s in keep if s["code"] in want]
+
+
+def sample_times(dur_ms, keep, n):
+    """Mốc lấy mẫu đều nhau (ms); có sheet → chỉ lấy trong các đoạn KEEP, chừa 2 giây hai đầu."""
+    if keep:
+        spans = [(s["start"] + 2000, s["end"] - 2000) for s in keep if s["end"] - s["start"] > 4000]
+        spans = [(a, min(b, dur_ms - 500)) for a, b in spans if a < dur_ms - 500]
+        total = sum(b - a for a, b in spans)
+        if total > 0:
+            out = []
+            for k in range(n):
+                pos = total * (2 * k + 1) // (2 * n)
+                for a, b in spans:
+                    if pos < b - a:
+                        out.append(a + pos)
+                        break
+                    pos -= b - a
+            return out
+    return [dur_ms * (10 + 180 * k // max(1, n - 1)) // 200 if n > 1 else dur_ms // 2 for k in range(n)]
+
+
+def grab_gray(video, t_ms, aw, ah):
+    res = subprocess.run(["ffmpeg", "-v", "error", "-ss", "%.3f" % (t_ms / 1000), "-i", video, "-frames:v", "1",
+                          "-vf", "scale=%d:%d,format=gray" % (aw, ah), "-f", "rawvideo", "-"], capture_output=True)
+    return res.stdout if len(res.stdout) == aw * ah else None
+
+
+def first_run(profile, need):
+    for i in range(len(profile) - need + 1):
+        if all(v >= ACTIVE_ROW for v in profile[i:i + need]):
+            return i
+    return None
+
+
+def snap_out(band, size, profiles):
+    """Mép nội dung tĩnh (vd giá sách đứng yên) bị tính nhầm là viền → dời mép RA NGOÀI tới đường biên sáng/tối rõ
+    nhất và ổn định qua các mẫu (biên thanh công cụ), trong phạm vi 4% kích thước. Chỉ dời ra ngoài: không mất nội dung."""
+    best, best_e = band, 0.0
+    for y in range(max(1, band - max(3, size * 4 // 100)), band + 1):
+        e = sum(abs(p[y] - p[y - 1]) for p in profiles) / len(profiles)
+        if e > best_e:
+            best, best_e = y, e
+    return best if best_e >= 6 else band
+
+
+def detect_content(video, w, h, times):
+    """Khung nội dung = vùng có chuyển động qua các mẫu; viền tĩnh (thanh menu, thanh công cụ Zoom, dải đen) bị loại.
+    Khung là hợp của mọi bố cục nên không mất nội dung; mẫu nào còn dải đen sát mép khung = bố cục đổi.
+    → (rect dict | None, lý do, [mốc mẫu còn dải đen], [mốc mọi mẫu đọc được])."""
+    aw = min(640, w) // 2 * 2
+    ah = even(round(h * aw / w))
+    pairs = [(t, f) for t, f in ((t, grab_gray(video, t, aw, ah)) for t in times) if f]
+    frames = [f for _, f in pairs]
+    used = [t for t, _ in pairs]
+    if len(frames) < 4:
+        return None, "chỉ đọc được %d khung mẫu (cần ≥ 4)" % len(frames), [], used
+    hi, lo = bytearray(frames[0]), bytearray(frames[0])
+    for f in frames[1:]:
+        hi = bytearray(map(max, hi, f))
+        lo = bytearray(map(min, lo, f))
+    act = [a - b > ACTIVE_DELTA for a, b in zip(hi, lo)]
+    rows = [sum(act[y * aw:(y + 1) * aw]) / aw for y in range(ah)]
+    cols = [sum(act[x::aw]) / ah for x in range(aw)]
+    top, bottom = first_run(rows, max(2, ah // 50)), first_run(rows[::-1], max(2, ah // 50))
+    left, right = first_run(cols, max(2, aw // 50)), first_run(cols[::-1], max(2, aw // 50))
+    if None in (top, bottom, left, right):
+        if sum(act) > 0.01 * len(act):
+            return None, ("vùng chuyển động quá nhỏ hoặc rời rạc (không hàng/cột nào ≥ %d%% chuyển động) — xem ảnh "
+                          "mẫu, tự nhập --crop" % (ACTIVE_ROW * 100)), [], used
+        return None, "hình gần như đứng yên qua %d mẫu — không đủ chuyển động để phân biệt nội dung với viền" % len(
+            frames), [], used
+    rmean = [[sum(f[y * aw:(y + 1) * aw]) / aw for y in range(ah)] for f in frames]
+    cmean = [[sum(f[x::aw]) / ah for x in range(aw)] for f in frames]
+    oriented = (rmean, [p[::-1] for p in rmean], cmean, [p[::-1] for p in cmean])
+    bands = []
+    for band, size, prof in zip((top, bottom, left, right), (ah, ah, aw, aw), oriented):
+        if band > MAX_BAND * size:
+            return None, "vùng nội dung quá nhỏ (một phía viền > %d%%) — kiểm tra ảnh mẫu, tự nhập --crop" % (
+                MAX_BAND * 100), [], used
+        band = snap_out(band, size, prof)
+        bands.append(0 if band <= size * 0.005 else band + 1)  # +1 điểm ảnh: lùi vào trong, tránh dính mép viền
+    sy, sx = h / ah, w / aw
+    y0 = math.ceil(bands[0] * sy / 2) * 2   # mép trên/trái làm tròn lên số chẵn (yuv420 cần toạ độ chẵn)
+    x0 = math.ceil(bands[2] * sx / 2) * 2
+    y1 = h - math.ceil(bands[1] * sy)
+    x1 = w - math.ceil(bands[3] * sx)
+    rect = {"x": x0, "y": y0, "w": even(x1 - x0), "h": even(y1 - y0)}
+    rect.update(top=rect["y"], left=rect["x"], bottom=h - rect["y"] - rect["h"], right=w - rect["x"] - rect["w"])
+    ty, by, lx, rx = bands[0], ah - bands[1], bands[2], aw - bands[3]
+    ky, kx = max(2, ah // 50), max(2, aw // 50)
+    dark = []
+    for t, f in pairs:
+        strips = (
+            [f[y * aw + x] for y in range(ty, ty + ky) for x in range(lx, rx)],
+            [f[y * aw + x] for y in range(by - ky, by) for x in range(lx, rx)],
+            [f[y * aw + x] for y in range(ty, by) for x in range(lx, lx + kx)],
+            [f[y * aw + x] for y in range(ty, by) for x in range(rx - kx, rx)],
+        )
+        if any(s and max(s) < 32 for s in strips):
+            dark.append(t)
+    return rect, "%d mẫu" % len(frames), dark, used
+
+
+def stamp(keep, ts):
+    """[00:42], [00:47] · đoạn P2 — mã đoạn theo thứ tự trong sheet."""
+    codes = [s["code"] for s in keep or [] if any(s["start"] <= t < s["end"] for t in ts)]
+    return ", ".join("[%s]" % short_tc(t) for t in ts) + (" · đoạn " + ", ".join(codes) if codes else "")
+
+
+def layout_warning(keep, dark, used):
+    """Bố cục đổi giữa các mẫu: nói rõ nhóm hẹp (còn dải đen trong khung hợp) và nhóm rộng, chỉ cách tách đúng hướng."""
+    wide = [t for t in used if t not in dark]
+    if not dark or not wide:
+        return
+    print("Cảnh báo: bố cục đổi giữa buổi — %d/%d mẫu bố cục hẹp (sẽ còn dải đen trong clip) %s; %d/%d mẫu bố cục "
+          "rộng (dùng hết khung) %s. Khung trên là hợp của hai bố cục: đủ nội dung, nhưng phần bố cục hẹp còn dải đen." % (
+              len(dark), len(used), stamp(keep, dark), len(wide), len(used), stamp(keep, wide)))
+    if not keep:
+        print("→ Thêm --sheet để biết đoạn nào thuộc bố cục nào, rồi tách bằng --only")
+        return
+    seg_of = lambda ts: [s["code"] for s in keep if any(s["start"] <= t < s["end"] for t in ts)]  # noqa: E731
+    narrow_only = [c for c in seg_of(dark) if c not in seg_of(wide)]
+    if narrow_only and seg_of(wide):
+        print("→ Tách khung: chạy riêng --only %s và --only %s, mỗi nhóm một --crop" % (
+            ",".join(narrow_only), ",".join(seg_of(wide))))
+    else:
+        print("→ Hai bố cục nằm chung đoạn %s: giữ khung trên (đủ nội dung) hoặc cắt tay đoạn đó" % ", ".join(
+            seg_of(dark + wide)))
+
+
+def parse_crop(text, w, h):
+    m = re.fullmatch(r"(\d+):(\d+):(\d+):(\d+)", text.strip())
+    if not m:
+        die("--crop cần dạng W:H:X:Y (vd 1116:626:78:56), 'auto' hoặc 'none'; nhận: %s" % text)
+    cw, ch, x, y = (int(v) for v in m.groups())
+    if cw < 2 or ch < 2 or x + cw > w or y + ch > h:
+        die("--crop %s nằm ngoài khung %dx%d" % (text, w, h))
+    x, y = x // 2 * 2, y // 2 * 2  # yuv420 cần toạ độ chẵn; in ra đúng số thực dùng
+    return {"x": x, "y": y, "w": even(cw), "h": even(ch), "top": y, "left": x,
+            "bottom": h - y - even(ch), "right": w - x - even(cw)}
+
+
+def parse_ratio(text):
+    m = re.fullmatch(r"(\d+)[:/x](\d+)", text.strip())
+    if not m or not int(m.group(1)) or not int(m.group(2)):
+        die("tỉ lệ khung cần dạng W:H (vd 16:9, 9:16, 4:5); nhận: %s" % text)
+    return int(m.group(1)), int(m.group(2))
+
+
+def output_size(cw, ch, aspect, res, size):
+    if size:
+        sw, sh = parse_ratio(size)
+        return even(sw), even(sh)
+    aw, ah = parse_ratio(aspect) if aspect and aspect != "source" else (cw, ch)
+    if res == "source":
+        short = min(cw, ch) if (aw >= ah) == (cw >= ch) else max(cw, ch) * min(aw, ah) // max(aw, ah)
+    else:
+        if not str(res).isdigit() or int(res) < 2:
+            die("--res cần số điểm ảnh cạnh ngắn (vd 1080) hoặc 'source'; nhận: %s" % res)
+        short = int(res)
+    if aw >= ah:
+        return even(short * aw / ah + 1), even(short)
+    return even(short), even(short * ah / aw + 1)
+
+
+def video_filter(rect, out, fit):
+    """Một chuỗi lọc dùng chung cho ảnh xem trước và lệnh cắt — xem trước thế nào, ra video thế ấy."""
+    head = "crop=%d:%d:%d:%d" % (rect["w"], rect["h"], rect["x"], rect["y"]) if rect else ""
+    if not out:
+        return head
+    W, H = out
+    fitted = "scale=%d:%d:force_original_aspect_ratio=%%s:force_divisible_by=2:flags=lanczos" % (W, H)
+    if fit == "fill":
+        tail = (fitted % "increase") + ",crop=%d:%d,setsar=1" % (W, H)
+    elif fit == "blur":
+        tail = ("split[a][b];[a]scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,boxblur=20:2[bg];"
+                "[b]%s[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1" % (W, H, W, H, fitted % "decrease"))
+    else:
+        tail = (fitted % "decrease") + ",pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1" % (W, H)
+    return head + "," + tail if head else tail
+
+
+def frame_plan(args, video, w, h, keep, crop_default):
+    """In kết quả khung hình và kế hoạch đầu ra. → (rect, out, vf, dark, used); vf rỗng = giữ nguyên hình;
+    dark/used = mốc mẫu bố cục hẹp / mọi mẫu (cho ảnh xem trước)."""
+    crop = args.crop or crop_default
+    times = sample_times(video_info(video)[2], keep, args.samples)
+    rect, dark, used = None, [], times
+    if crop == "auto":
+        rect, why, dark, used = detect_content(video, w, h, times)
+        if rect is None:
+            print("Viền thừa: không kết luận được — %s. Giữ nguyên khung." % why)
+        elif not (rect["top"] or rect["bottom"] or rect["left"] or rect["right"]):
+            print("Viền thừa: không có (%s) — giữ nguyên khung %dx%d." % (why, w, h))
+            rect = None
+        else:
+            print("Viền thừa: có (%s) — trên %d · dưới %d · trái %d · phải %d px" % (
+                why, rect["top"], rect["bottom"], rect["left"], rect["right"]))
+            print("Khung nội dung: %dx%d → --crop %d:%d:%d:%d" % (
+                rect["w"], rect["h"], rect["w"], rect["h"], rect["x"], rect["y"]))
+        layout_warning(keep, dark, used)
+    elif crop != "none":
+        rect = parse_crop(crop, w, h)
+        print("Khung nội dung (nhập tay): %dx%d tại %d,%d" % (rect["w"], rect["h"], rect["x"], rect["y"]))
+    cw, ch = (rect["w"], rect["h"]) if rect else (w, h)
+    out = None
+    if args.aspect or args.res or args.size:
+        out = output_size(cw, ch, args.aspect, args.res or "source", args.size)
+    if out:
+        W, H = out
+        rc, rt = cw / ch, W / H
+        lost = 1 - min(rc, rt) / max(rc, rt)
+        scale = min(W / cw, H / ch) if args.fit != "fill" else max(W / cw, H / ch)
+        how = {"pad": "giữ toàn bộ nội dung, nền đen", "fill": "phủ kín khung, cắt bớt mép nội dung",
+               "blur": "giữ toàn bộ nội dung, nền mờ"}[args.fit]
+        print("Đầu ra: %dx%d (%s) · nội dung %dx%d · tỉ lệ nội dung %.2f, khung %.2f · phóng x%.2f" % (
+            W, H, how, cw, ch, rc, rt, scale))
+        if lost > 0.005:
+            print("%s: %s %.0f%% khung" % (
+                "Cảnh báo" if args.fit == "fill" else "Ghi chú",
+                "fill cắt mất mép nội dung, khoảng" if args.fit == "fill" else
+                ("nền đen" if args.fit == "pad" else "nền mờ") + " chiếm khoảng", lost * 100))
+        if scale > 1.01:
+            print("Cảnh báo: phóng to x%.2f không tạo thêm chi tiết thật — hình đạt khung chuẩn %dx%d, độ nét "
+                  "không vượt bản gốc" % (scale, W, H))
+    elif rect:
+        print("Đầu ra: %dx%d (chỉ cắt viền, không đổi cỡ)" % (cw, ch))
+    vf = video_filter(rect, out, args.fit) if (rect or out) else ""
+    return rect, out, vf, dark, used
+
+
+def preview_paths(out_dir):
+    return os.path.join(out_dir, "khung-phat-hien.png"), os.path.join(out_dir, "khung-dau-ra.png")
+
+
+def spread(ts, n):
+    return [ts[i * (len(ts) - 1) // max(1, n - 1)] for i in range(n)] if len(ts) > n else list(ts)
+
+
+def write_previews(video, h, rect, vf, used, dark, keep, out_dir):
+    """Hai ảnh để duyệt bằng mắt: 4 mẫu có khung đỏ (đủ cả hai bố cục nếu bố cục đổi) và 1 khung đầu ra lấy từ bố cục
+    đa số, chạy qua đúng chuỗi lọc sẽ dùng khi cắt."""
+    detect, final = preview_paths(out_dir)
+    refuse(detect, final)
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+    except OSError as exc:
+        die("không tạo được thư mục %s: %s" % (out_dir, exc))
+    wide = [t for t in used if t not in dark]
+    if dark and wide:
+        nd = min(len(dark), max(2, 4 - len(wide)))
+        picks = sorted(spread(dark, nd) + spread(wide, 4 - nd))
+    else:
+        picks = spread(used, 4)
+    cmd = ["ffmpeg", "-v", "error", "-n"]
+    for t in picks:
+        cmd += ["-ss", "%.3f" % (t / 1000), "-i", video]
+    box = "drawbox=%d:%d:%d:%d:color=red@0.9:t=%d," % (
+        rect["x"], rect["y"], rect["w"], rect["h"], max(2, h // 120)) if rect else ""
+    parts = ["[%d:v]%sscale=640:-2,setsar=1[v%d]" % (i, box, i) for i in range(len(picks))]
+    if len(picks) == 4:
+        graph = ";".join(parts) + ";[v0][v1][v2][v3]xstack=inputs=4:layout=0_0|w0_0|0_h0|w0_h0[o]"
+    else:
+        graph = parts[0].replace("[v0]", "[o]")
+    res = subprocess.run(cmd + ["-filter_complex", graph, "-map", "[o]", "-frames:v", "1", detect],
+                         capture_output=True, text=True)
+    if res.returncode != 0:
+        die("không tạo được ảnh %s: %s" % (detect, res.stderr.strip()))
+    group = dark if len(dark) > len(wide) else (wide or used)
+    mid = group[len(group) // 2]
+    res = subprocess.run(["ffmpeg", "-v", "error", "-n", "-ss", "%.3f" % (mid / 1000), "-i", video,
+                          "-vf", vf or "null", "-frames:v", "1", final], capture_output=True, text=True)
+    if res.returncode != 0:
+        die("không tạo được ảnh %s: %s" % (final, res.stderr.strip()))
+    print("Ảnh xem trước: %s (%s)" % (detect, "khung đỏ = phần giữ lại" if rect else "không vẽ khung: giữ khung gốc"))
+    places = ["trên-trái", "trên-phải", "dưới-trái", "dưới-phải"] if len(picks) == 4 else ["ảnh"]
+    for place, t in zip(places, picks):
+        print("  %s: %s%s" % (place, stamp(keep, [t]), " (bố cục hẹp)" if dark and wide and t in dark else
+                                " (bố cục rộng)" if dark and wide else ""))
+    print("Ảnh xem trước: %s (khung đầu ra, mẫu %s%s)" % (final, stamp(keep, [mid]),
+                                                       ", bố cục đa số" if dark and wide else ""))
+
+
+def wants_frame(args):
+    return bool((args.crop and args.crop != "none") or args.aspect or args.res or args.size)
+
+
+def encoder_args(args):
+    if args.encoder == "videotoolbox":
+        return ["-c:v", "h264_videotoolbox", "-q:v", "65", "-pix_fmt", "yuv420p", "-tag:v", "avc1"]
+    return ["-c:v", "libx264", "-preset", "medium", "-crf", str(args.crf), "-pix_fmt", "yuv420p", "-tag:v", "avc1"]
+
+
+def cmd_frame(args):
+    if not os.path.isfile(args.video):
+        die("không tìm thấy file video nguồn: %s" % args.video)
+    check_tools("ffmpeg", "ffprobe")
+    w, h, d = video_info(args.video)
+    if args.only and not args.sheet:
+        die("--only cần --sheet")
+    if args.preview:
+        refuse(*preview_paths(args.preview))
+    keep = select_only(parse_sheet_auto(args.sheet, args.prefix), args.only) if args.sheet else None
+    print("# frame: %s" % args.video)
+    print("Khung gốc: %dx%d · %s · mẫu lấy %s" % (w, h, long_(d), "trong đoạn KEEP" if keep else "đều cả video"))
+    rect, out, vf, dark, used = frame_plan(args, args.video, w, h, keep, "auto")
+    if vf:
+        print("Chuỗi lọc: %s" % vf)
+    if args.preview:
+        write_previews(args.video, h, rect, vf, used, dark, keep, args.preview)
+
+
 # ---------------------------------------------------------------- Lệnh CLI
 
 def cmd_probe(args):
@@ -339,7 +713,15 @@ def cmd_cut(args):
         die("không tìm thấy file video nguồn: %s" % args.video)
     check_tools("ffmpeg")
 
-    keep = parse_sheet_auto(args.sheet, args.prefix)
+    keep = select_only(parse_sheet_auto(args.sheet, args.prefix), args.only)
+    vf = ""
+    if wants_frame(args):  # kiểm khung trước khảo sát âm thanh: --crop sai bị từ chối ngay
+        w, h, _ = video_info(args.video)
+        print("Khung hình (gốc %dx%d):" % (w, h))
+        _, _, vf, _, _ = frame_plan(args, args.video, w, h, keep, "none")
+        print("→ Hình mã hoá lại: %s" % ("x264 CRF %d" % args.crf if args.encoder == "x264"
+                                          else "VideoToolbox (nhanh hơn, nét kém hơn x264)"))
+
     mode = args.mode
     audio = None
     if mode == "auto":
@@ -356,8 +738,16 @@ def cmd_cut(args):
 
     is_mono = (audio.get("ch2") is None) if audio else False
     pan_filter = "pan=stereo|c0=c0|c1=c0" if is_mono else "pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1"
+    video_args = ["-vf", vf] + encoder_args(args) if vf else ["-c:v", "copy"]
+    if mode == "balance":
+        audio_args = ["-af", pan_filter, "-c:a", "aac", "-b:a", "192k"]
+    elif mode == "master":
+        audio_args = ["-af", "%s,loudnorm=I=-16:TP=-1.5:LRA=11" % pan_filter, "-c:a", "aac", "-b:a", "192k"]
+    else:
+        audio_args = ["-c:a", "copy"]
 
-    print("\nBắt đầu cắt %d video con (chế độ: %s)..." % (len(keep), mode))
+    print("\nBắt đầu cắt %d video con (âm thanh: %s · hình: %s)..." % (
+        len(keep), mode, "mã hoá lại" if vf else "giữ nguyên"))
     for idx, s in enumerate(keep, 1):
         out_path = os.path.join(args.out_dir, s["out_name"])
         if not args.dry_run and os.path.lexists(out_path):
@@ -366,31 +756,18 @@ def cmd_cut(args):
         st_tc = long_(s["start"])
         en_tc = long_(s["end"])
         cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-ss", st_tc, "-to", en_tc, "-i", args.video]
-
-        if mode == "copy":
-            cmd += ["-c", "copy"]
-        elif mode == "balance":
-            cmd += [
-                "-c:v", "copy",
-                "-af", pan_filter,
-                "-c:a", "aac", "-b:a", "192k"
-            ]
-        elif mode == "master":
-            cmd += [
-                "-c:v", "copy",
-                "-af", "%s,loudnorm=I=-16:TP=-1.5:LRA=11" % pan_filter,
-                "-c:a", "aac", "-b:a", "192k"
-            ]
-        cmd += [out_path, "-y"]
+        cmd += video_args + audio_args + ["-movflags", "+faststart", "-n", out_path]
 
         if args.dry_run:
             print("[%d/%d] DRY-RUN: %s (%s → %s)" % (idx, len(keep), s["out_name"], st_tc, en_tc))
-            print("  Lệnh: %s" % " ".join(cmd))
+            print("  Lệnh: %s" % shlex.join(cmd))
             continue
 
         print("[%d/%d] Đang cắt: %s (%s → %s, %s)..." % (idx, len(keep), s["out_name"], st_tc, en_tc, dur(s["end"] - s["start"])))
         res = subprocess.run(cmd, capture_output=True, text=True)
         if res.returncode != 0:
+            if os.path.exists(out_path):
+                os.remove(out_path)  # file dở do chính lệnh này tạo (đã kiểm chưa tồn tại trước khi chạy)
             die("Lỗi ffmpeg khi cắt %s: %s" % (s["out_name"], res.stderr))
 
     if not args.dry_run:
@@ -410,16 +787,16 @@ def cmd_verify(args):
         print("Thư mục trống, không có file .mp4 nào.")
         return
 
-    print("| STT | Tên file con | Dung lượng | Thời lượng | Trạng thái |")
-    print("| :---: | :--- | :---: | :---: | :---: |")
+    print("| STT | Tên file con | Dung lượng | Thời lượng | Khung hình | Trạng thái |")
+    print("| :---: | :--- | :---: | :---: | :---: | :---: |")
+    expect = None
+    if args.expect_size:
+        ew, eh = parse_ratio(args.expect_size)
+        expect = "%dx%d" % (ew, eh)
 
     sheet_segs = {}
     if args.sheet:
-        try:
-            keep = parse_sheet_auto(args.sheet)
-            sheet_segs = {s["out_name"]: s for s in keep}
-        except Exception:
-            pass
+        sheet_segs = {s["out_name"]: s for s in parse_sheet_auto(args.sheet, args.prefix)}
 
     errors = 0
     for idx, f in enumerate(files, 1):
@@ -427,23 +804,35 @@ def cmd_verify(args):
         size_mb = os.path.getsize(fpath) / (1024 * 1024)
 
         cmd = [
-            "ffprobe", "-v", "error", "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1", fpath
+            "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height:format=duration",
+            "-of", "json", fpath
         ]
         res = subprocess.run(cmd, capture_output=True, text=True)
-        dur_sec = float(res.stdout.strip()) if res.stdout.strip() else 0.0
+        try:
+            info = json.loads(res.stdout or "{}")
+            dur_sec = float(info.get("format", {}).get("duration", 0))
+            st = (info.get("streams") or [{}])[0]
+            size = "%sx%s" % (st.get("width", "?"), st.get("height", "?"))
+        except ValueError:
+            dur_sec, size = 0.0, "?"
 
         status = "HỢP LỆ"
         if size_mb <= 0 or dur_sec <= 0:
             status = "LỖI: RỖNG"
+            errors += 1
+        elif expect and size != expect:
+            status = "LỖI: KHUNG %s ≠ %s" % (size, expect)
             errors += 1
         elif f in sheet_segs:
             expected_sec = (sheet_segs[f]["end"] - sheet_segs[f]["start"]) / 1000
             if abs(dur_sec - expected_sec) > 3.0:
                 status = "CẢNH BÁO: LỆCH THỜI LƯỢNG"
 
-        print("| %d | %s | %.1f MB | %dp %02ds | %s |" % (
-            idx, f, size_mb, int(dur_sec // 60), int(dur_sec % 60), status))
+        print("| %d | %s | %.1f MB | %dp %02ds | %s | %s |" % (
+            idx, f, size_mb, int(dur_sec // 60), int(dur_sec % 60), size, status))
+    if sheet_segs and not set(files) & set(sheet_segs):
+        print("Cảnh báo: không clip nào khớp tên trong %s — thời lượng chưa được đối chiếu; kiểm --prefix giống lúc cắt"
+              % args.sheet)
 
     print("\nKết quả kiểm tra: %d clip hợp lệ, %d lỗi" % (len(files) - errors, errors))
     if errors:
@@ -454,32 +843,54 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Cắt nhỏ video bài giảng dài theo Action Sheet.")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
+    frame_opts = argparse.ArgumentParser(add_help=False)
+    frame_opts.add_argument("--crop", help="auto | none | W:H:X:Y")
+    frame_opts.add_argument("--aspect", help="16:9 | 9:16 | 1:1 | 4:5 | W:H | source")
+    frame_opts.add_argument("--res", help="cạnh ngắn đầu ra, vd 1080; hoặc source")
+    frame_opts.add_argument("--size", help="kích thước tuỳ chỉnh WxH, vd 1080x1350")
+    frame_opts.add_argument("--fit", choices=["pad", "fill", "blur"], default="pad")
+    frame_opts.add_argument("--samples", type=int, default=12)
+    frame_opts.add_argument("--only", help="chỉ các đoạn KEEP có mã này, vd P4,P5.1")
+
     p = sub.add_parser("probe")
     p.add_argument("video")
     p.add_argument("--sample-time", default="00:15:00")
     p.add_argument("--duration", type=int, default=30)
     p.set_defaults(fn=cmd_probe)
 
+    p = sub.add_parser("frame", parents=[frame_opts])
+    p.add_argument("video")
+    p.add_argument("--sheet")
+    p.add_argument("--prefix", default="")
+    p.add_argument("--preview", help="thư mục ghi ảnh xem trước")
+    p.set_defaults(fn=cmd_frame)
+
     p = sub.add_parser("parse")
     p.add_argument("sheet")
     p.add_argument("--prefix", default="")
     p.set_defaults(fn=cmd_parse)
 
-    p = sub.add_parser("cut")
+    p = sub.add_parser("cut", parents=[frame_opts])
     p.add_argument("video")
     p.add_argument("--sheet", required=True)
     p.add_argument("--out-dir", required=True)
     p.add_argument("--prefix", default="")
     p.add_argument("--mode", choices=["auto", "copy", "balance", "master"], default="auto")
+    p.add_argument("--encoder", choices=["x264", "videotoolbox"], default="x264")
+    p.add_argument("--crf", type=int, default=18)
     p.add_argument("--dry-run", action="store_true")
     p.set_defaults(fn=cmd_cut)
 
     p = sub.add_parser("verify")
     p.add_argument("dir")
     p.add_argument("--sheet")
+    p.add_argument("--prefix", default="")
+    p.add_argument("--expect-size", help="WxH mọi clip phải đạt, vd 1920x1080")
     p.set_defaults(fn=cmd_verify)
 
     args = ap.parse_args(argv)
+    if getattr(args, "samples", 4) < 4:
+        die("--samples cần ≥ 4")
     args.fn(args)
 
 
