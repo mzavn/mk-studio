@@ -7,6 +7,20 @@ Mỗi bản có số dạng `X.Y.Z` (chung cho cả bộ skill):
 - **Số đầu (X)** tăng: cập nhật xong bạn cần làm thêm một bước — bản đó sẽ ghi rõ bước gì.
 
 Cập nhật: `bash ~/.mk-studio/install.sh --update`.
+
+## Chưa phát hành
+
+Dự kiến: v0.4.0
+
+### mk-video-cutter
+
+**Mới**
+
+- **Khung hình sạch cho video quay màn hình Zoom.** Lệnh mới `frame` tự tìm vùng bài giảng, bỏ thanh menu, thanh tiêu đề, thanh công cụ Zoom và dải đen, rồi xuất 2 ảnh xem trước (khung đỏ trên 4 mẫu, và một khung hình thành phẩm) để bạn duyệt trước khi cắt. Nếu Zoom đổi bố cục giữa buổi, lệnh báo đoạn nào bị ảnh hưởng; dùng `--only P4` để cắt riêng đoạn đó với khung riêng.
+- **Xuất khung 16:9, 9:16, 1:1, 4:5 hoặc kích thước tuỳ chỉnh, chuẩn 1080p.** Mặc định giữ trọn hình và bù nền đen (`--fit pad`); `blur` cho nền mờ ở video dọc; `fill` phủ kín nhưng cắt mép (lệnh báo rõ mất bao nhiêu phần trăm). Nâng 720p lên 1080p chỉ đạt khung chuẩn, không thêm chi tiết, và lệnh có in cảnh báo điều này.
+- Đổi khung thì hình được nén lại bằng x264 CRF 18 (đo trên bài giảng thật: VMAF 97/100, khoảng 1/5 thời lượng clip trên Apple Silicon); `--encoder videotoolbox` nhanh hơn nhưng nét kém hơn. Không đổi khung thì hình vẫn giữ nguyên như trước.
+- `verify --expect-size 1920x1080` kiểm thêm khung hình của từng clip; `verify --prefix` đối chiếu đúng tên clip đã cắt có tiền tố (trước đây thời lượng bị bỏ qua không báo). Clip lỗi giữa chừng không còn để lại file dở.
+
 ## v0.3.0 — 29/10/2026
 
 ### mk-video-cutter

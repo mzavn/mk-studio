@@ -13,7 +13,7 @@ Bộ skill kỹ thuật & lập trình đi kèm là **[mk-lab](https://github.co
 | **`mk-star`** | `/mk:star` | *"viết nhật ký ngày"*, *"giải quyết vấn đề"*, *"luyện case 05"* | Hệ nhật ký STAR 5 loại: biến cảm xúc/vấn đề/thành công thành quyết định, kế hoạch và tài sản đóng gói. Lưu hoàn toàn ở máy cá nhân (`~/nhat-ky-star/`). |
 | **`mk-exec-review`** | `/mk:exec-review <file>` | *"phản biện bài <đường dẫn>"*, *"đọc bài như CEO"*, *"soát bài"* | Hội đồng C-level (CEO, CFO, CMO, COO, CTO) phản biện bài viết theo chân dung khách hàng thật, bóc giọng văn AI, chuẩn hóa thuật ngữ, tối ưu SEO/GEO/AEO, duyệt từng mã gợi ý trước khi sửa. |
 | **`mk-subtitle`** | `/mk:subtitle <file>` | *"xử lý phụ đề <file>"*, *"cắt ừ à"*, *"chia file con"*, *"cắt bài giảng"* | Phụ đề cho khâu dựng video và chia buổi học dài thành file con: duyệt từ đệm xoá khỏi phụ đề kèm danh sách cắt, chuẩn hoá tiếng Việt, dịch tiếng Anh, lập Bảng lệnh Editor (Action Sheet) cắt rác/giải lao và chia bài giảng 20–30p giữ trọn vẹn ngữ cảnh vấn đáp. |
-| **`mk-video-cutter`** | `/mk:video-cutter <video>` | *"cắt video"*, *"chia clip con"*, *"video chunking"*, *"cân bằng âm thanh"* | Cắt nhỏ video bài giảng dài (2–4 tiếng) thành các video chuyên đề con theo Action Sheet: tự động probe âm thanh, cắt siêu tốc bảo toàn 100% hình ảnh gốc (`-c:v copy`), cân bằng Dual-Mono Center, loudnorm -16 LUFS, và nghiệm thu bằng `ffprobe`. |
+| **`mk-video-cutter`** | `/mk:video-cutter <video>` | *"cắt video"*, *"chia clip con"*, *"bỏ thanh zoom"*, *"video dọc 9:16"*, *"nâng 1080p"* | Cắt video bài giảng dài thành clip chuyên đề theo Action Sheet: tự cắt viền thừa của video quay màn hình (thanh menu, thanh Zoom, dải đen) có ảnh xem trước để duyệt, xuất khung 16:9 / 9:16 / tuỳ chỉnh chuẩn 1080p giữ trọn hình, hoặc giữ nguyên hình gốc; cân bằng âm thanh hai tai, chuẩn âm lượng -16 LUFS, nghiệm thu bằng `ffprobe`. |
 
 > **Lưu ý tên lệnh và quyền:**
 > - Gọi nhanh qua slash command: `/mk:star`, `/mk:exec-review`, `/mk:subtitle`, `/mk:video-cutter`. Thư mục cài đặt và cờ `--skill` dùng tên gạch nối: `mk-star`, `mk-exec-review`, `mk-subtitle`, `mk-video-cutter`.
@@ -86,16 +86,15 @@ Gõ `/mk:subtitle <file .srt, .vtt hoặc .txt>`. Skill cung cấp hai mode nghi
 5. **Cắt video con & Cân bằng âm thanh (Lossless FFmpeg):** khảo sát âm lượng/lệch kênh hai tai bằng lệnh `probe-audio`, tự động cắt hàng loạt video con theo Action Sheet với tốc độ siêu tốc (`-c:v copy` giữ nguyên 100% chất lượng hình ảnh gốc, chỉ re-encode audio sang AAC 192k khi cần cân bằng âm thanh và đưa về chuẩn -16 LUFS).
 ---
 
-## 4. mk:video-cutter — Cắt nhỏ video bài giảng & Tự động cân bằng âm thanh
+## 4. mk:video-cutter — Cắt video bài giảng: khung hình sạch, âm thanh đều
 
-Gõ `/mk:video-cutter <file_video.mp4> --sheet <file_action_sheet>`. Skill tự động phân rã video bài giảng dài (2–4 tiếng) thành các video chuyên đề con (10–30 phút) theo đúng Action Sheet:
+Gõ `/mk:video-cutter <file_video.mp4> --sheet <file_action_sheet>`. Skill phân rã video bài giảng dài (2–4 tiếng) thành các clip chuyên đề (10–30 phút) theo Action Sheet:
 
-1. **Khảo sát âm thanh (Pre-flight probe):** Tự động đo độ lớn RMS hai tai, phát hiện tình trạng điếc một bên tai hoặc âm lượng quá nhỏ.
-2. **3 chế độ sản xuất:**
-   - `Mode 1 (copy)`: Stream Copy không re-encode video và audio (`-c copy`), tốc độ siêu tốc (vài giây), giữ nguyên 100% bit-by-bit gốc.
-   - `Mode 2 (balance)`: Cân bằng Dual-Mono Center (`pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1`) phủ đều âm thanh ra hai tai khi nguồn bị điếc tai trái/phải.
-   - `Mode 3 (master)`: Cân bằng Dual-Mono kết hợp kích âm lượng đạt chuẩn phát thanh quốc tế EBU R128 (`-16 LUFS`).
-3. **Nghiệm thu toàn vẹn:** Tự động chạy `ffprobe` kiểm tra dung lượng, thời lượng và tính toàn vẹn của từng clip con trong thư mục xuất.
+1. **Khảo sát âm thanh:** đo độ lớn hai tai, phát hiện điếc một bên hoặc âm lượng quá nhỏ, chọn chế độ `copy` (giữ nguyên), `balance` (dual-mono) hoặc `master` (dual-mono + chuẩn -16 LUFS).
+2. **Khung hình sạch (mới):** video quay cả cửa sổ Zoom thường dính thanh menu, thanh công cụ và dải đen. Skill tìm vùng bài giảng (phần chuyển động) và xuất 2 ảnh xem trước: khung đỏ = phần giữ, và một khung hình thành phẩm. Bạn duyệt rồi mới cắt. Nếu Zoom đổi bố cục giữa buổi, skill báo đoạn bị ảnh hưởng để cắt riêng.
+3. **Khung đầu ra:** 16:9, 9:16, 1:1, 4:5 hoặc kích thước tuỳ chỉnh; 1080p hoặc giữ độ phân giải gốc. Mặc định giữ trọn hình và bù nền đen; video dọc có thể dùng nền mờ. Nâng 720p lên 1080p chỉ giúp đạt khung chuẩn, không làm hình nét hơn bản gốc.
+4. **Chất lượng:** không đổi khung thì hình giữ nguyên từng điểm ảnh, cắt cả bài trong vài giây. Đổi khung thì máy nén lại ở mức cao (đo trên bài giảng thật: VMAF 97/100), mất khoảng 1/5 thời lượng clip trên Mac Apple Silicon.
+5. **Nghiệm thu:** `ffprobe` kiểm dung lượng, thời lượng, khung hình từng clip (`--expect-size 1920x1080`).
 
 ---
 
