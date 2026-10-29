@@ -7,6 +7,22 @@ Mỗi bản có số dạng `X.Y.Z` (chung cho cả bộ skill):
 - **Số đầu (X)** tăng: cập nhật xong bạn cần làm thêm một bước — bản đó sẽ ghi rõ bước gì.
 
 Cập nhật: `bash ~/.mk-studio/install.sh --update`.
+## Chưa phát hành
+
+Dự kiến: v0.3.0
+
+### mk-video-cutter
+
+**Mới**
+
+- **Skill `mk:video-cutter` — Cắt nhỏ video bài giảng & tự động cân bằng âm thanh:** Gõ `/mk:video-cutter <video> --sheet <file>`. Tự động bóc tách Action Sheet từ Markdown bài giảng, file `PLAN.txt` hoặc CSV; chạy Pre-flight probe khảo sát âm thanh; cắt hàng loạt video con chuyên đề bảo toàn nguyên bản 100% độ nét gốc (`-c:v copy`), tự động cân bằng âm thanh Dual-Mono và chuẩn hóa âm lượng EBU R128 (`-16 LUFS`); chạy nghiệm thu tính toàn vẹn và thời lượng clip con bằng `ffprobe`.
+
+### mk-subtitle
+
+**Mới**
+
+- **Chia buổi học dài thành file con (Quy trình Kaizen):** Hỗ trợ xử lý bản chép lời bài giảng 2–4 tiếng (TXT có mốc đầu dòng `[mm:ss]`, SRT, VTT). Quét tín hiệu rác đầu giờ (mic check, điểm danh, ổn định lớp), giờ nghỉ giải lao, quãng lặng bất thường; lập Bảng chỉ dẫn Editor (Action Sheet) chuẩn 20–30 phút/file con kèm lệnh 🛑 CUT / 🟢 KEEP; bảo toàn 100% ngữ cảnh vấn đáp `[A Hỏi - B Đáp]` và đối thoại Socrates 3 nhịp; xuất khung bài giảng Markdown; xuất phụ đề `.srt` riêng từng file con (được tính lại giờ bắt đầu từ 00:00:00); kiểm tra lỗi bằng lệnh lint máy và tự động tạo dòng tổng kết Kaizen cho nhật ký khoá học.
+- **Khảo sát âm thanh & Cắt video con tự động (FFmpeg Stream Copy):** Thêm subcommand `probe-audio` (đo RMS, kiểm tra lệch kênh stereo/mono hoặc điếc một bên tai, đề xuất 3 chế độ `copy`/`balance`/`master`) và subcommand `cut-video` (đọc Action Sheet cắt hàng loạt video con giữ nguyên 100% chất lượng hình ảnh gốc `-c:v copy`, tự động cân bằng âm thanh và đưa về chuẩn -16 LUFS khi cần, hỗ trợ `--dry-run`).
 
 ## v0.2.0 — 28/10/2026
 

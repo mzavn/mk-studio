@@ -12,10 +12,11 @@ Bộ skill kỹ thuật & lập trình đi kèm là **[mk-lab](https://github.co
 |---|---|---|---|
 | **`mk-star`** | `/mk:star` | *"viết nhật ký ngày"*, *"giải quyết vấn đề"*, *"luyện case 05"* | Hệ nhật ký STAR 5 loại: biến cảm xúc/vấn đề/thành công thành quyết định, kế hoạch và tài sản đóng gói. Lưu hoàn toàn ở máy cá nhân (`~/nhat-ky-star/`). |
 | **`mk-exec-review`** | `/mk:exec-review <file>` | *"phản biện bài <đường dẫn>"*, *"đọc bài như CEO"*, *"soát bài"* | Hội đồng C-level (CEO, CFO, CMO, COO, CTO) phản biện bài viết theo chân dung khách hàng thật, bóc giọng văn AI, chuẩn hóa thuật ngữ, tối ưu SEO/GEO/AEO, duyệt từng mã gợi ý trước khi sửa. |
-| **`mk-subtitle`** | `/mk:subtitle <file>` | *"xử lý phụ đề <file>"*, *"cắt ừ à"*, *"dịch phụ đề sang tiếng Anh"* | Phụ đề cho khâu dựng video: đánh dấu từ đệm để bạn duyệt, xoá khỏi phụ đề kèm danh sách đoạn cắt cho editor, chuẩn hoá tiếng Việt, dịch tiếng Anh khớp mốc thời gian, phụ đề cho timeline đã cắt. |
+| **`mk-subtitle`** | `/mk:subtitle <file>` | *"xử lý phụ đề <file>"*, *"cắt ừ à"*, *"chia file con"*, *"cắt bài giảng"* | Phụ đề cho khâu dựng video và chia buổi học dài thành file con: duyệt từ đệm xoá khỏi phụ đề kèm danh sách cắt, chuẩn hoá tiếng Việt, dịch tiếng Anh, lập Bảng lệnh Editor (Action Sheet) cắt rác/giải lao và chia bài giảng 20–30p giữ trọn vẹn ngữ cảnh vấn đáp. |
+| **`mk-video-cutter`** | `/mk:video-cutter <video>` | *"cắt video"*, *"chia clip con"*, *"video chunking"*, *"cân bằng âm thanh"* | Cắt nhỏ video bài giảng dài (2–4 tiếng) thành các video chuyên đề con theo Action Sheet: tự động probe âm thanh, cắt siêu tốc bảo toàn 100% hình ảnh gốc (`-c:v copy`), cân bằng Dual-Mono Center, loudnorm -16 LUFS, và nghiệm thu bằng `ffprobe`. |
 
 > **Lưu ý tên lệnh và quyền:**
-> - Gọi nhanh qua slash command: `/mk:star`, `/mk:exec-review`, `/mk:subtitle`. Thư mục cài đặt và cờ `--skill` dùng tên gạch nối: `mk-star`, `mk-exec-review`, `mk-subtitle`.
+> - Gọi nhanh qua slash command: `/mk:star`, `/mk:exec-review`, `/mk:subtitle`, `/mk:video-cutter`. Thư mục cài đặt và cờ `--skill` dùng tên gạch nối: `mk-star`, `mk-exec-review`, `mk-subtitle`, `mk-video-cutter`.
 > - Tiền tố `mk:` là quy ước định danh riêng của bộ skill này, **không** phải plugin Claude Code tên `mk`. Nếu bạn cấu hình quyền trong `settings.json`, hãy khai báo theo tên skill, vd `Skill(mk:star)`.
 ---
 
@@ -62,18 +63,39 @@ Bộ skill kỹ thuật & lập trình đi kèm là **[mk-lab](https://github.co
 
 ---
 
-## 3. mk:subtitle — Phụ đề cho khâu dựng video
+## 3. mk:subtitle — Phụ đề & chia file con cho khâu dựng video
 
-Gõ `/mk:subtitle <file .srt hoặc .vtt>`. Skill nhận phụ đề có sẵn (kể cả phụ đề tự động của YouTube, có mốc thời gian từng từ) và làm 4 việc:
+Gõ `/mk:subtitle <file .srt, .vtt hoặc .txt>`. Skill cung cấp hai mode nghiệp vụ:
+
+### Mode phụ đề (SRT / VTT)
 
 1. **Từ đệm "à, ừ, ờ, ừm…" và lặp từ:** đánh dấu thành hai nhóm — A (âm đệm giữa câu, đề xuất xoá) và B (cần nghe lại: câu đáp "Ừ, đúng rồi", tiểu từ hỏi "Thế à?", lặp từ). Bạn duyệt mã nào thì mới xoá khỏi phụ đề và đưa vào danh sách đoạn cắt cho editor.
 2. **Chia câu, ngắt dòng:** tối đa 2 dòng × 42 ký tự, cảnh báo cue đọc không kịp.
-3. **Chuẩn hoá tiếng Việt:** sửa lỗi nhận giọng theo bảng thuật ngữ của repo (vd bảng "ghi âm sai → chuẩn" trong `CLAUDE.md`), chính tả, dấu câu, số; giữ đúng lời người nói, chỗ nghe không rõ liệt kê để bạn xác nhận.
+3. **Chuẩn hoá tiếng Việt:** sửa lỗi nhận giọng theo bảng thuật ngữ của repo, chính tả, dấu câu; giữ đúng lời người nói, chỗ chưa chắc đưa vào danh sách xác nhận.
 4. **Dịch tiếng Anh:** mỗi cue dịch đúng một cue, cùng mốc thời gian.
+5. **Đầu ra:** thư mục giao file gồm phụ đề Việt/Anh timeline gốc, phụ đề sau cắt, track `✂` tham chiếu timeline, `cat.csv` và `BAN-GIAO.md`.
 
-Đầu ra là một thư mục mới cạnh file gốc (file gốc không bị đụng): phụ đề Việt/Anh cho video gốc, phụ đề Việt/Anh cho video **sau khi cắt**, track `✂` chỉ chỗ cắt trên timeline, danh sách đoạn cắt `.csv`, và `BAN-GIAO.md` hướng dẫn editor. Mọi file là `.srt` nên dùng được với CapCut, Premiere Pro, DaVinci Resolve, Final Cut Pro.
+### Mode chia buổi học dài thành file con (Quy trình Kaizen)
 
-Cắt chính xác tới từng từ khi đầu vào là phụ đề tự động YouTube; với SRT thường, từ đệm giữa câu chỉ có mốc ước lượng để editor nghe rồi cắt.
+Áp dụng cho bài giảng dài 2–4 tiếng (bản chép lời có mốc `[mm:ss]` TXT/MD, SRT hoặc VTT):
+
+1. **Phản biện 3 trục (Fable-Thinking):** lọc sạch 100% thời gian chết (mic check đầu giờ, giải lao giữa bài, mất tiếng, thủ tục bế mạc) nhưng bảo toàn trọn vẹn tri thức cốt lõi.
+2. **Topic-First 20–30 phút:** chia bài giảng thành các file con chuẩn vàng kèm mã định danh đồng bộ (`Buổi 1:P1`, `Buổi 1:P2`…; ca vấn đáp độc lập đặt mã `P5.1`, `P5.2`…).
+3. **Bảo toàn ngữ cảnh:** bắt buộc đủ cấu trúc hai vế `[A Hỏi]` (bối cảnh) và `[B Đáp]` (khai tuệ); giữ trọn vẹn nhịp 3 bước của đối thoại Socrates `[B Hỏi]` → `[A Đáp]` → `[B Khai Tuệ]`.
+4. **Đầu ra hoàn chỉnh cho Editor:** xuất **Bảng lệnh Editor (Action Sheet)** với timecode chính xác và lệnh 🛑 CUT / 🟢 KEEP; sinh khung bài giảng Markdown; xuất phụ đề `.srt` riêng từng file con (bắt đầu từ 00:00:00); kiểm tra lỗi bằng lệnh lint và xuất dòng tổng kết Kaizen sau mỗi buổi.
+5. **Cắt video con & Cân bằng âm thanh (Lossless FFmpeg):** khảo sát âm lượng/lệch kênh hai tai bằng lệnh `probe-audio`, tự động cắt hàng loạt video con theo Action Sheet với tốc độ siêu tốc (`-c:v copy` giữ nguyên 100% chất lượng hình ảnh gốc, chỉ re-encode audio sang AAC 192k khi cần cân bằng âm thanh và đưa về chuẩn -16 LUFS).
+---
+
+## 4. mk:video-cutter — Cắt nhỏ video bài giảng & Tự động cân bằng âm thanh
+
+Gõ `/mk:video-cutter <file_video.mp4> --sheet <file_action_sheet>`. Skill tự động phân rã video bài giảng dài (2–4 tiếng) thành các video chuyên đề con (10–30 phút) theo đúng Action Sheet:
+
+1. **Khảo sát âm thanh (Pre-flight probe):** Tự động đo độ lớn RMS hai tai, phát hiện tình trạng điếc một bên tai hoặc âm lượng quá nhỏ.
+2. **3 chế độ sản xuất:**
+   - `Mode 1 (copy)`: Stream Copy không re-encode video và audio (`-c copy`), tốc độ siêu tốc (vài giây), giữ nguyên 100% bit-by-bit gốc.
+   - `Mode 2 (balance)`: Cân bằng Dual-Mono Center (`pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1`) phủ đều âm thanh ra hai tai khi nguồn bị điếc tai trái/phải.
+   - `Mode 3 (master)`: Cân bằng Dual-Mono kết hợp kích âm lượng đạt chuẩn phát thanh quốc tế EBU R128 (`-16 LUFS`).
+3. **Nghiệm thu toàn vẹn:** Tự động chạy `ffprobe` kiểm tra dung lượng, thời lượng và tính toàn vẹn của từng clip con trong thư mục xuất.
 
 ---
 
@@ -81,7 +103,7 @@ Cắt chính xác tới từng từ khi đầu vào là phụ đề tự động
 
 - Hệ điều hành: macOS hoặc Linux (hỗ trợ `bash` 3.2 trở lên).
 - Python: `python3` ≥ 3.8 (chỉ sử dụng thư viện chuẩn, không cần cài thư viện ngoài).
-- Công cụ: `git`, và [GitHub CLI](https://cli.github.com) đã đăng nhập (`gh auth status`) vì kho chứa là **private**.
+- Công cụ: `git`, [GitHub CLI](https://cli.github.com) đã đăng nhập (`gh auth status`), và `ffmpeg` / `ffprobe` (cho tính năng khảo sát âm thanh & cắt video).
 - Coding agent: Bất kỳ agent nào đọc thư mục skill chuẩn (`.claude/skills` hoặc `.agents/skills` như Claude Code, omp, Codex…).
 
 ---
