@@ -7,9 +7,7 @@ Mỗi bản có số dạng `X.Y.Z` (chung cho cả bộ skill):
 - **Số đầu (X)** tăng: cập nhật xong bạn cần làm thêm một bước — bản đó sẽ ghi rõ bước gì.
 
 Cập nhật: `bash ~/.mk-studio/install.sh --update`.
-## Chưa phát hành
-
-Dự kiến: v0.3.0
+## v0.3.0 — 29/10/2026
 
 ### mk-video-cutter
 

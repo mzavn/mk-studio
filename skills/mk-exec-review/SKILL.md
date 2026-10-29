@@ -4,7 +4,7 @@ description: 'Phản biện một bài viết tiếng Việt (markdown) trước
 license: MIT
 metadata:
   author: mzavn
-  version: "0.2.0"
+  version: "0.3.0"
 ---
 
 # mk:exec-review — Hội đồng C-level phản biện bài viết

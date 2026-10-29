@@ -4,7 +4,7 @@ description: 'Lossless video chunking and audio balancing pipeline: split long l
 license: MIT
 metadata:
   author: mzavn
-  version: "0.1.0"
+  version: "0.3.0"
 ---
 
 # mk:video-cutter — Cắt nhỏ video bài giảng & Tự động cân bằng âm thanh
