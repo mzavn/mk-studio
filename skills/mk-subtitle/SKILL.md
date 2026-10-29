@@ -4,7 +4,7 @@ description: 'Subtitles and long-lecture splitting for video editing: clean fill
 license: MIT
 metadata:
   author: mzavn
-  version: "0.3.0"
+  version: "0.4.0"
 ---
 
 # mk:subtitle — Phụ đề & chia file con cho khâu dựng video
