@@ -10,6 +10,7 @@ metadata:
 # mk:video-cutter — Cắt video bài giảng: khung hình sạch, âm thanh đều
 
 Video nguồn + Action Sheet → khảo sát âm thanh → khảo sát khung hình (ảnh xem trước để duyệt) → chạy thử → cắt hàng loạt → nghiệm thu. `<skill>` = thư mục chứa file `SKILL.md` này; viết tắt `C` = `python3 <skill>/scripts/cutter.py`.
+Windows: chạy các lệnh trong Git Bash; máy không có `python3` thì thay bằng `python` (hoặc `py -3`). `--encoder videotoolbox` chỉ có trên macOS.
 
 **Phạm vi.** Skill xử lý: đo âm thanh hai tai và chọn chế độ âm thanh; đọc Action Sheet từ Markdown bài giảng, `PLAN.txt` hoặc `sheet.csv`; phát hiện viền tĩnh thừa của video quay màn hình (thanh menu, thanh tiêu đề và thanh công cụ Zoom, dải đen) bằng ảnh xem trước; xuất khung 16:9, 9:16, 1:1, 4:5 hoặc kích thước tuỳ chỉnh, tự chọn độ phân giải chuẩn một bậc trên nguồn (720p → 1080p), giữ trọn nội dung (bù nền đen/nền mờ); làm sạch khối nén, nhiễu và làm nét vừa phải; giữ nguyên hình bằng stream copy khi không đổi khung; nghiệm thu thời lượng và khung hình từng clip. **Không** xử lý: tạo Action Sheet (dùng `mk:subtitle` mode chia buổi); phóng to bằng AI hay khôi phục chi tiết không có trong nguồn, lên 2K/4K từ nguồn 720p (chỉ giới thiệu công cụ cài thêm, `references/khung-hinh.md` §7); xoá cửa sổ chat/popup nằm đè lên giữa nội dung; dựng phim, chèn đồ hoạ, phụ đề cứng; xoá hay ghi đè file nguồn/clip đã có; tải video lên dịch vụ ngoài.
 

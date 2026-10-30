@@ -39,6 +39,13 @@ def die(msg):
     sys.exit(1)
 
 
+def utf8_stdio():
+    """Windows ghi ra pipe bằng bảng mã hệ thống (cp1252…) → chữ Việt làm script dừng. Ép UTF-8 cho stdout/stderr."""
+    for s in (sys.stdout, sys.stderr):
+        if hasattr(s, "reconfigure"):
+            s.reconfigure(encoding="utf-8", errors="replace")
+
+
 def read_text(path):
     try:
         with open(path, encoding="utf-8-sig") as fh:
@@ -82,7 +89,8 @@ def refuse(*paths):
 def check_tools(*names):
     for name in names:
         if not shutil.which(name):
-            die("cần công cụ '%s' trong PATH để thực hiện thao tác" % name)
+            die("cần công cụ '%s' trong PATH để thực hiện thao tác — cài ffmpeg: brew install ffmpeg (macOS), "
+                "winget install Gyan.FFmpeg (Windows), rồi mở lại terminal" % name)
 
 
 # ---------------------------------------------------------------- Bóc tách Action Sheet
@@ -208,7 +216,7 @@ def probe_metadata(video):
         "format=duration,size:stream=index,codec_name,codec_type,width,height",
         "-of", "json", video
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if res.returncode != 0:
         die("không đọc được thông số video từ %s: %s" % (video, res.stderr))
     try:
@@ -224,7 +232,7 @@ def probe_audio(video, sample_time="00:15:00", duration=30):
         "ffmpeg", "-hide_banner", "-ss", sample_time, "-t", str(duration),
         "-i", video, "-af", "astats=metadata=1:reset=1", "-f", "null", "-"
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     out = res.stderr
 
     ch1_m = re.search(r"Channel:\s*1.*?RMS level dB:\s*([-\d.inf]+)", out, re.S | re.I)
@@ -238,7 +246,7 @@ def probe_audio(video, sample_time="00:15:00", duration=30):
             "ffmpeg", "-hide_banner", "-ss", sample_time, "-t", str(duration),
             "-i", video, "-af", "astats=metadata=1:reset=1", "-f", "null", "-"
         ]
-        res = subprocess.run(cmd, capture_output=True, text=True)
+        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         out = res.stderr
         ch1_m = re.search(r"Channel:\s*1.*?RMS level dB:\s*([-\d.inf]+)", out, re.S | re.I)
         ch2_m = re.search(r"Channel:\s*2.*?RMS level dB:\s*([-\d.inf]+)", out, re.S | re.I)
@@ -301,7 +309,7 @@ def video_info(video):
     check_tools("ffprobe")
     res = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
                           "stream=width,height:format=duration", "-of", "json", video],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8", errors="replace")
     try:
         data = json.loads(res.stdout)
         st = data["streams"][0]
@@ -652,13 +660,14 @@ def write_previews(video, h, rect, vf, used, dark, keep, out_dir):
     else:
         graph = parts[0].replace("[v0]", "[o]")
     res = subprocess.run(cmd + ["-filter_complex", graph, "-map", "[o]", "-frames:v", "1", detect],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8", errors="replace")
     if res.returncode != 0:
         die("không tạo được ảnh %s: %s" % (detect, res.stderr.strip()))
     group = dark if len(dark) > len(wide) else (wide or used)
     mid = group[len(group) // 2]
     res = subprocess.run(["ffmpeg", "-v", "error", "-n", "-ss", "%.3f" % (mid / 1000), "-i", video,
-                          "-vf", vf or "null", "-frames:v", "1", final], capture_output=True, text=True)
+                          "-vf", vf or "null", "-frames:v", "1", final], capture_output=True, text=True,
+                         encoding="utf-8", errors="replace")
     if res.returncode != 0:
         die("không tạo được ảnh %s: %s" % (final, res.stderr.strip()))
     print("Ảnh xem trước: %s (%s)" % (detect, "khung đỏ = phần giữ lại" if rect else "không vẽ khung: giữ khung gốc"))
@@ -815,7 +824,7 @@ def cmd_cut(args):
             continue
 
         print("[%d/%d] Đang cắt: %s (%s → %s, %s)..." % (idx, len(keep), s["out_name"], st_tc, en_tc, dur(s["end"] - s["start"])))
-        res = subprocess.run(cmd, capture_output=True, text=True)
+        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if res.returncode != 0:
             if os.path.exists(out_path):
                 os.remove(out_path)  # file dở do chính lệnh này tạo (đã kiểm chưa tồn tại trước khi chạy)
@@ -858,7 +867,7 @@ def cmd_verify(args):
             "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height:format=duration",
             "-of", "json", fpath
         ]
-        res = subprocess.run(cmd, capture_output=True, text=True)
+        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         try:
             info = json.loads(res.stdout or "{}")
             dur_sec = float(info.get("format", {}).get("duration", 0))
@@ -891,6 +900,7 @@ def cmd_verify(args):
 
 
 def main(argv=None):
+    utf8_stdio()
     ap = argparse.ArgumentParser(description="Cắt nhỏ video bài giảng dài theo Action Sheet.")
     sub = ap.add_subparsers(dest="cmd", required=True)
 

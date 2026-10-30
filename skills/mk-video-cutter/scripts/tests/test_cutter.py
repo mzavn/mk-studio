@@ -395,5 +395,17 @@ class TestResAuto(Base):
         self.assertIn("Đầu ra: 2560x1440", out)  # khung ngang: một bậc trên nguồn
 
 
+class TestWindowsPipeEncoding(Base):
+    """Windows ghi ra pipe bằng bảng mã hệ thống (cp1252): chữ Việt không được làm script dừng."""
+
+    def test_parse_prints_vietnamese_under_cp1252(self):
+        plan_file = self.path("plan.txt", SAMPLE_PLAN)
+        env = dict(os.environ, PYTHONIOENCODING="cp1252")
+        res = subprocess.run([sys.executable, SCRIPT, "parse", plan_file, "--prefix", "Buổi 1"],
+                             capture_output=True, env=env)
+        self.assertEqual(res.returncode, 0, res.stderr.decode("utf-8", "replace"))
+        self.assertIn("Buổi 1-P1 - Khởi Động.mp4", res.stdout.decode("utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()
