@@ -8,9 +8,7 @@ Mỗi bản có số dạng `X.Y.Z` (chung cho cả bộ skill):
 
 Cập nhật: `bash ~/.mk-studio/install.sh --update`.
 
-## Chưa phát hành
-
-Dự kiến: v0.6.1
+## v0.6.1 — 30/10/2026
 
 ### mk-subtitle, mk-video-cutter
 

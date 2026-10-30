@@ -4,7 +4,7 @@ description: 'Cut long lecture/class recordings (2–4 hours) into topic clips f
 license: MIT
 metadata:
   author: mzavn
-  version: "0.6.0"
+  version: "0.6.1"
 ---
 
 # mk:video-cutter — Cắt video bài giảng: khung hình sạch, âm thanh đều
