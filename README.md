@@ -12,7 +12,7 @@ Bộ skill kỹ thuật & lập trình đi kèm là **[mk-lab](https://github.co
 |---|---|---|---|
 | **`mk-star`** | `/mk:star` | *"viết nhật ký ngày"*, *"giải quyết vấn đề"*, *"luyện case 05"* | Hệ nhật ký STAR 5 loại: biến cảm xúc/vấn đề/thành công thành quyết định, kế hoạch và tài sản đóng gói. Lưu hoàn toàn ở máy cá nhân (`~/nhat-ky-star/`). |
 | **`mk-exec-review`** | `/mk:exec-review <file>` | *"phản biện bài <đường dẫn>"*, *"đọc bài như CEO"*, *"soát bài"* | Hội đồng C-level (CEO, CFO, CMO, COO, CTO) phản biện bài viết theo chân dung khách hàng thật, bóc giọng văn AI, chuẩn hóa thuật ngữ, tối ưu SEO/GEO/AEO, duyệt từng mã gợi ý trước khi sửa. |
-| **`mk-subtitle`** | `/mk:subtitle <file hoặc link YouTube>` | *"xử lý phụ đề <file>"*, *"lấy phụ đề youtube"*, *"cắt ừ à"*, *"chia file con"*, *"cắt bài giảng"* | Phụ đề cho khâu dựng video và chia buổi học dài thành file con: tải phụ đề có sẵn từ link YouTube (có mốc từng từ), duyệt từ đệm xoá khỏi phụ đề kèm danh sách cắt, chuẩn hoá tiếng Việt, dịch tiếng Anh, lập Bảng lệnh Editor (Action Sheet) cắt rác/giải lao và chia bài giảng 20–30p giữ trọn vẹn ngữ cảnh vấn đáp. |
+| **`mk-subtitle`** | `/mk:subtitle <file, video hoặc link YouTube>` | *"xử lý phụ đề <file>"*, *"lấy phụ đề youtube"*, *"làm phụ đề cho video"*, *"cắt ừ à"*, *"chia file con"*, *"cắt chỗ nói lại"* | Phụ đề cho khâu dựng video, chia buổi học dài thành file con và làm bản final cho video có kịch bản: tải phụ đề có sẵn từ link YouTube (có mốc từng từ) hoặc chép lời bằng Gemini qua `agy` (mốc đo trên âm thanh), duyệt từ đệm, chuẩn hoá tiếng Việt, dịch tiếng Anh, lập Bảng lệnh Editor chia bài giảng 20–30p giữ trọn vấn đáp, bỏ câu đọc lại và ghép một file final. |
 | **`mk-video-cutter`** | `/mk:video-cutter <video>` | *"cắt video"*, *"chia clip con"*, *"bỏ thanh zoom"*, *"video dọc 9:16"*, *"nâng 1080p"*, *"làm nét video"* | Cắt video bài giảng dài thành clip chuyên đề theo Action Sheet: tự cắt viền thừa của video quay màn hình (thanh menu, thanh Zoom, dải đen) có ảnh xem trước để duyệt, xuất khung 16:9 / 9:16 / tuỳ chỉnh ở chuẩn phù hợp nguồn (720p → 1080p), làm nét vừa phải, giữ trọn hình, hoặc giữ nguyên hình gốc; cân bằng âm thanh hai tai, chuẩn âm lượng -16 LUFS, nghiệm thu bằng `ffprobe`. |
 
 > **Lưu ý tên lệnh và quyền:**
@@ -65,9 +65,9 @@ Bộ skill kỹ thuật & lập trình đi kèm là **[mk-lab](https://github.co
 
 ## 3. mk:subtitle — Phụ đề & chia file con cho khâu dựng video
 
-Gõ `/mk:subtitle <file .srt, .vtt hoặc .txt>` hoặc đưa **link YouTube**. Skill cung cấp hai mode nghiệp vụ.
+Gõ `/mk:subtitle <file .srt, .vtt, .txt, video>` hoặc đưa **link YouTube**. Skill có ba mode nghiệp vụ.
 
-**Chưa có phụ đề?** Video đã đăng YouTube (kể cả không công khai) → skill tải phụ đề có sẵn trong vài giây (cần `yt-dlp`), ưu tiên bản chủ kênh tải lên, không có thì bản tự động gốc có mốc từng từ; bản dịch máy bị từ chối. Chỉ có file video → skill không tự nhận giọng, hướng dẫn bạn tự cài whisper.cpp (miễn phí, chạy trên máy) để tạo SRT rồi quay lại.
+**Chưa có phụ đề?** Video đã đăng YouTube (kể cả không công khai) → skill tải phụ đề có sẵn trong vài giây (cần `yt-dlp`), ưu tiên bản chủ kênh tải lên, không có thì bản tự động gốc có mốc từng từ; bản dịch máy bị từ chối. Chỉ có file video (khoảng ≤ 15 phút) → nếu bạn đồng ý gửi âm thanh lên Google, skill chia video thành từng cụm lời theo khoảng ngừng, nhờ Gemini qua Antigravity CLI (`agy`) chép lời từng cụm, còn mốc thời gian đo trên chính âm thanh (mốc Gemini tự đưa hay lệch nên không dùng). Không đồng ý → đăng YouTube không công khai rồi tải phụ đề, hoặc tự cài whisper.cpp (miễn phí, chạy trên máy).
 
 ### Mode phụ đề (SRT / VTT)
 
@@ -86,6 +86,15 @@ Gõ `/mk:subtitle <file .srt, .vtt hoặc .txt>` hoặc đưa **link YouTube**. 
 3. **Bảo toàn ngữ cảnh:** bắt buộc đủ cấu trúc hai vế `[A Hỏi]` (bối cảnh) và `[B Đáp]` (khai tuệ); giữ trọn vẹn nhịp 3 bước của đối thoại Socrates `[B Hỏi]` → `[A Đáp]` → `[B Khai Tuệ]`.
 4. **Đầu ra hoàn chỉnh cho Editor:** xuất **Bảng lệnh Editor (Action Sheet)** với timecode chính xác và lệnh 🛑 CUT / 🟢 KEEP; sinh khung bài giảng Markdown; xuất phụ đề `.srt` riêng từng file con (bắt đầu từ 00:00:00); kiểm tra lỗi bằng lệnh lint và xuất dòng tổng kết Kaizen sau mỗi buổi.
 5. **Cắt video con & Cân bằng âm thanh (Lossless FFmpeg):** khảo sát âm lượng/lệch kênh hai tai bằng lệnh `probe-audio`, tự động cắt hàng loạt video con theo Action Sheet với tốc độ siêu tốc (`-c:v copy` giữ nguyên 100% chất lượng hình ảnh gốc, chỉ re-encode audio sang AAC 192k khi cần cân bằng âm thanh và đưa về chuẩn -16 LUFS).
+
+### Mode video có kịch bản (bản final)
+
+Video quay một lần, người nói đọc lại hoặc vấp vài chỗ (thường dưới 15 phút):
+
+1. **Cụm lời đúng mốc:** tách cụm theo khoảng ngừng ở dải tần giọng nói — đo trên video thật, ranh giới lệch trung vị khoảng 0,03 giây; báo phần đầu/cuối không có lời.
+2. **Lời từng cụm:** từ phụ đề có sẵn, hoặc Gemini qua `agy` (đoạn chỉ có nhạc ghi `NONE`).
+3. **Tìm câu đọc lại:** câu nói lại y nguyên, câu gần giống, cụm lặp cuối–đầu — cần có khoảng ngừng trước lần đọc lại, nên câu lặp có chủ ý (điệp ngữ) không bị cắt. Ra bảng 🛑 CUT / 🟢 KEEP để bạn duyệt.
+4. **Bản final:** cắt mốc lẻ giây, ghép một file (x264 CRF 18, giữ khung gốc, làm mờ tiếng 20 ms ở điểm nối), kèm phụ đề Việt/Anh đã dời mốc; script tự so thời lượng. Đổi khung, lên 1080p thì chạy tiếp `mk:video-cutter`.
 ---
 
 ## 4. mk:video-cutter — Cắt video bài giảng: khung hình sạch, âm thanh đều

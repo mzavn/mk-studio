@@ -8,6 +8,18 @@ Mỗi bản có số dạng `X.Y.Z` (chung cho cả bộ skill):
 
 Cập nhật: `bash ~/.mk-studio/install.sh --update`.
 
+## Chưa phát hành
+
+Dự kiến: v0.7.0
+
+### mk-subtitle
+
+**Mới**
+
+- **Làm bản final cho video có kịch bản.** Video quay một lần mà người nói đọc lại, vấp vài chỗ: skill tìm câu đọc lại (nói lại y nguyên, gần giống, lặp cụm cuối–đầu), đưa bảng cắt để bạn duyệt, rồi cắt chính xác tới phần trăm giây và ghép thành **một file final** kèm phụ đề Việt/Anh khớp bản final. Câu lặp có chủ ý trong kịch bản (ngừng ngắn) được giữ.
+- **Chỉ có file video, chưa có phụ đề:** nếu bạn đồng ý gửi âm thanh lên Google, skill nhờ Gemini qua Antigravity CLI (`agy`) chép lời từng cụm, còn mốc thời gian đo trên chính âm thanh — chính xác hơn mốc Gemini tự đưa (có thể lệch hàng chục giây). Có link YouTube thì vẫn ưu tiên tải phụ đề YouTube.
+- Trên macOS 26 có thêm công cụ tuỳ chọn lấy mốc từng từ bằng bộ đọc chính tả có sẵn của máy.
+
 ## v0.6.1 — 30/10/2026
 
 ### mk-subtitle, mk-video-cutter
