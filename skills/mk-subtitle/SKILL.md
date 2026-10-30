@@ -4,7 +4,7 @@ description: 'Subtitles and long-lecture splitting for video editing: fetch exis
 license: MIT
 metadata:
   author: mzavn
-  version: "0.5.0"
+  version: "0.6.0"
 ---
 
 # mk:subtitle — Phụ đề & chia file con cho khâu dựng video
