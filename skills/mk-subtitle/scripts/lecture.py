@@ -562,7 +562,8 @@ def cmd_lint(args):
 def check_tools(*names):
     for name in names:
         if not shutil.which(name):
-            st.die("cần công cụ '%s' trong PATH để xử lý video/âm thanh" % name)
+            st.die("cần công cụ '%s' trong PATH để xử lý video/âm thanh — cài ffmpeg: brew install ffmpeg (macOS), "
+                   "winget install Gyan.FFmpeg (Windows), rồi mở lại terminal" % name)
 
 
 def probe_audio(video, sample_time="00:15:00", duration=30):
@@ -571,7 +572,7 @@ def probe_audio(video, sample_time="00:15:00", duration=30):
         "ffmpeg", "-hide_banner", "-ss", sample_time, "-t", str(duration),
         "-i", video, "-af", "astats=metadata=1:reset=1", "-f", "null", "-"
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     out = res.stderr
 
     ch1_m = re.search(r"Channel:\s*1.*?RMS level dB:\s*([-\d.inf]+)", out, re.S | re.I)
@@ -584,7 +585,7 @@ def probe_audio(video, sample_time="00:15:00", duration=30):
             "ffmpeg", "-hide_banner", "-ss", sample_time, "-t", str(duration),
             "-i", video, "-af", "astats=metadata=1:reset=1", "-f", "null", "-"
         ]
-        res = subprocess.run(cmd, capture_output=True, text=True)
+        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         out = res.stderr
         ch1_m = re.search(r"Channel:\s*1.*?RMS level dB:\s*([-\d.inf]+)", out, re.S | re.I)
         ch2_m = re.search(r"Channel:\s*2.*?RMS level dB:\s*([-\d.inf]+)", out, re.S | re.I)
@@ -748,7 +749,7 @@ def cmd_cut_video(args):
 
         print("[%d/%d] Đang cắt: %s (%s → %s, %s)..." % (
             idx, len(keep_segs), out_name, start_tc, end_tc, dur(s["end"] - s["start"])))
-        res = subprocess.run(cmd, capture_output=True, text=True)
+        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if res.returncode != 0:
             st.die("Lỗi ffmpeg khi cắt %s: %s" % (out_name, res.stderr))
 
@@ -759,6 +760,7 @@ def cmd_cut_video(args):
 
 
 def main(argv=None):
+    st.utf8_stdio()
     ap = argparse.ArgumentParser(description="Chia buổi học dài thành file con cho editor.")
     sub = ap.add_subparsers(dest="cmd", required=True)
     plan_opts = argparse.ArgumentParser(add_help=False)

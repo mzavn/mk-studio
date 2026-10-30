@@ -19,7 +19,7 @@ S fetch "<link YouTube>" --out-dir <thư mục> [--name <tên>] [--lang vi] [--k
   [--cookies-from-browser chrome] [--allow-translation]
 ```
 
-- Cần `yt-dlp` trên máy; chưa có → script báo cách cài (`brew install yt-dlp` hoặc `pip install yt-dlp`). Hỏi người dùng trước khi cài.
+- Cần `yt-dlp` trên máy; chưa có → script báo cách cài (`brew install yt-dlp` trên macOS, `winget install yt-dlp.yt-dlp` trên Windows, hoặc `pip install yt-dlp`). Hỏi người dùng trước khi cài.
 - `<thư mục>`: thư mục người dùng chỉ định, không nói thì thư mục làm việc hiện tại. `--name`: tên ngắn người dùng đặt; chưa có → chạy không `--name` (tên = mã video), dòng `Video:` in tiêu đề để đặt tên cho các bước sau.
 - Chỉ tải phụ đề, **không tải video**. Chỉ nhận link trỏ tới **một video** (`watch?v=`, `youtu.be/`, `/shorts/`, `/live/`; thiếu `https://` cũng được); link playlist, kênh bị từ chối. Từ chối ghi đè trước khi gọi mạng.
 - `--kind any` (mặc định): lấy phụ đề **chủ kênh tải lên** nếu có; không có thì lấy phụ đề **tự động gốc** (`vi-orig`). `--kind auto`: buộc lấy bản tự động gốc (mốc từng từ) — dùng khi bản tải lên đã bị biên tập mà cần cắt từ đệm.

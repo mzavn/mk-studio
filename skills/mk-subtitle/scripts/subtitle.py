@@ -45,6 +45,13 @@ def die(msg):
     sys.exit(1)
 
 
+def utf8_stdio():
+    """Windows ghi ra pipe bằng bảng mã hệ thống (cp1252…) → chữ Việt làm script dừng. Ép UTF-8 cho stdout/stderr."""
+    for s in (sys.stdout, sys.stderr):
+        if hasattr(s, "reconfigure"):
+            s.reconfigure(encoding="utf-8", errors="replace")
+
+
 MEDIA_EXT = (".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v", ".mp3", ".m4a", ".wav", ".aac", ".flac", ".ogg")
 
 
@@ -742,10 +749,10 @@ def youtube_video(url):
 
 def ytdlp(args, url, cookies):
     """Chạy yt-dlp (không tải video). Lỗi → dừng, gợi ý cookies khi video cần đăng nhập. → stdout."""
-    cmd = ["yt-dlp", "--skip-download", "--no-playlist"] + args
+    cmd = ["yt-dlp", "--encoding", "utf-8", "--skip-download", "--no-playlist"] + args
     if cookies:
         cmd += ["--cookies-from-browser", cookies]
-    res = subprocess.run(cmd + ["--", url], capture_output=True, text=True)
+    res = subprocess.run(cmd + ["--", url], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if res.returncode != 0:
         errs = [l for l in res.stderr.splitlines() if l.startswith("ERROR")]
         err = errs[-1] if errs else res.stderr.strip()[-300:]
@@ -765,7 +772,8 @@ def cmd_fetch(args):
     dest = os.path.join(args.out_dir, "%s.%s.vtt" % (args.name or vid, lang))
     refuse_overwrite(dest)  # trước mọi lần gọi mạng
     if not shutil.which("yt-dlp"):
-        die("cần yt-dlp để tải phụ đề YouTube — cài: brew install yt-dlp (hoặc pip install yt-dlp), rồi chạy lại")
+        die("cần yt-dlp để tải phụ đề YouTube — cài: brew install yt-dlp (macOS), winget install yt-dlp.yt-dlp (Windows) "
+            "hoặc pip install yt-dlp, rồi chạy lại")
     info = (ytdlp(["--print", "%(language)s\t%(title)s"], url, args.cookies_from_browser).strip().split("\n") or [""])[-1]
     spoken, _, title = info.partition("\t")
     spoken = "" if spoken in ("NA", "None") else spoken
@@ -817,6 +825,7 @@ def cmd_fetch(args):
 
 
 def main(argv=None):
+    utf8_stdio()
     ap = argparse.ArgumentParser(description="Xử lý phụ đề SRT/VTT cho khâu dựng video.")
     sub = ap.add_subparsers(dest="cmd", required=True)
     fmt_opts = argparse.ArgumentParser(add_help=False)

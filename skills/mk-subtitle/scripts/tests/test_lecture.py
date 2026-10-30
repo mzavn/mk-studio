@@ -390,5 +390,18 @@ class TestCutVideo(Base):
         self.assertIn("đã có — xoá file hoặc đổi thư mục (không ghi đè)", err_overwrite)
 
 
+class TestWindowsPipeEncoding(Base):
+    """Windows ghi ra pipe bằng bảng mã hệ thống (cp1252): chữ Việt không được làm script dừng."""
+
+    def test_scan_prints_vietnamese_under_cp1252(self):
+        env = dict(os.environ, PYTHONIOENCODING="cp1252")
+        cases = ((SCRIPT, self.path("Buổi 99.txt", SAMPLE_TXT)),
+                 (os.path.join(os.path.dirname(SCRIPT), "subtitle.py"), self.path("Buổi 99.srt", SAMPLE_SRT)))
+        for script, src in cases:
+            res = subprocess.run([sys.executable, script, "scan", src], capture_output=True, env=env)
+            self.assertEqual(res.returncode, 0, res.stderr.decode("utf-8", "replace"))
+            self.assertIn("Loại:", res.stdout.decode("utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()

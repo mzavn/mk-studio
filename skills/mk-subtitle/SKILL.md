@@ -16,6 +16,7 @@ Hai mode xử lý tài nguyên video:
 `<skill>` = thư mục chứa file `SKILL.md` này; lệnh script viết tắt:
 - `S` = `python3 <skill>/scripts/subtitle.py`
 - `L` = `python3 <skill>/scripts/lecture.py`
+- Windows: chạy các lệnh trong Git Bash; máy không có `python3` thì thay bằng `python` (hoặc `py -3`).
 
 **Phạm vi.** Skill xử lý: file SRT/VTT có sẵn (kể cả VTT tự động YouTube có mốc từng từ) và bản chép lời có mốc đầu dòng `[mm:ss]` (TXT/MD); tải phụ đề có sẵn của video YouTube từ link (yt-dlp, không tải video); từ đệm và lặp từ (đánh dấu → duyệt → xoá + danh sách cắt); chuẩn hoá lỗi nhận giọng, chính tả, dấu câu, thuật ngữ tiếng Việt; dịch tiếng Anh khớp mốc thời gian; chia buổi học dài thành các file con 20–30 phút chuẩn vàng; bảo toàn 100% ngữ cảnh vấn đáp [A Hỏi - B Đáp] và đối thoại Socrates; tạo Bảng chỉ dẫn Editor (Action Sheet); xuất phụ đề riêng từng file con; kiểm tra lỗi cú pháp và mốc thời gian bằng máy; tạo dòng tổng kết Kaizen sau mỗi buổi; khảo sát âm thanh (RMS, lệch kênh stereo/mono) và cắt video con hàng loạt bằng FFmpeg theo Action Sheet mà không suy hao hình ảnh gốc (-c:v copy). **Không** xử lý: tự nhận giọng từ audio/video (chỉ hướng dẫn người dùng tự cài công cụ, `references/lay-phu-de.md` §3); re-encode toàn bộ video làm giảm chất lượng gốc; dịch sang ngôn ngữ khác ngoài tiếng Anh; viết lại, tóm tắt làm đổi ý người giảng khi chưa được yêu cầu; gửi nội dung lên dịch vụ bên ngoài.
 
