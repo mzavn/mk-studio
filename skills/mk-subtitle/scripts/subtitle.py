@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Xử lý phụ đề SRT/VTT cho khâu dựng video (chỉ thư viện chuẩn, đầu ra tất định, không sửa file đầu vào).
 
+  subtitle.py fetch URL --out-dir DIR [--lang vi] [--kind any|manual|auto] [--name TÊN] [--cookies-from-browser chrome]
   subtitle.py scan IN [--glossary FILE]... [--fix "sai=chuẩn"]... [--more "từ"]...
   subtitle.py fillers IN --out FILLERS.tsv [--more "từ"]...
   subtitle.py clean IN --fillers FILLERS.tsv --approve "A,F012,F020-F025" [--reject "F007"]
@@ -11,6 +12,8 @@
   subtitle.py retime SRT --cuts PREFIX.csv --out OUT.srt
 
 Đầu vào: SRT; VTT thường; VTT tự động của YouTube (có mốc thời gian từng từ — cắt chính xác, chia lại câu).
+fetch: tải phụ đề có sẵn của video YouTube bằng yt-dlp (không tải video) → DIR/<tên>.<lang>.vtt; ưu tiên phụ đề chủ kênh
+tải lên, không có thì phụ đề tự động (bản gốc "<lang>-orig", có mốc từng từ). Chỉ nhận link YouTube.
 Nhóm từ đệm: A = âm đệm giữa câu (à, ừ, ờ, ừm…) — đề xuất xoá; B = cần nghe lại (đầu/cuối câu, câu hỏi, lặp từ,
 từ người dùng thêm bằng --more). Lỗi đầu vào/lệnh sai → in "Lỗi: …", thoát 1, không ghi file nào.
 """
@@ -20,8 +23,12 @@ import hashlib
 import html
 import os
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import unicodedata
+import urllib.parse
 
 sys.dont_write_bytecode = True
 HARD = {"à", "ừ", "ờ", "ừm", "ờm", "ơ", "ư", "hmm", "hm", "ừa"}
@@ -38,7 +45,13 @@ def die(msg):
     sys.exit(1)
 
 
+MEDIA_EXT = (".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v", ".mp3", ".m4a", ".wav", ".aac", ".flac", ".ogg")
+
+
 def read(path):
+    if path.lower().endswith(MEDIA_EXT):
+        die("%s là file video/âm thanh — skill cần phụ đề SRT/VTT hoặc bản chép lời: có link YouTube thì dùng "
+            "`subtitle.py fetch`, không thì tự tạo phụ đề theo references/lay-phu-de.md §3" % path)
     try:
         with open(path, encoding="utf-8-sig") as fh:
             return unicodedata.normalize("NFC", fh.read().replace("\r\n", "\n").replace("\r", "\n"))
@@ -700,12 +713,126 @@ def cmd_retime(args):
                                                           args.out))
 
 
+YT_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"}
+BROWSERS = ["brave", "chrome", "chromium", "edge", "firefox", "opera", "safari", "vivaldi"]
+VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
+
+
+def youtube_video(url):
+    """Link YouTube → (mã video, link chuẩn watch?v=). Chỉ nhận link trỏ tới đúng một video; tự thêm https:// khi thiếu."""
+    u = url.strip()
+    if not re.match(r"(?i)https?://", u):
+        u = "https://" + u
+    p = urllib.parse.urlsplit(u)
+    host = (p.hostname or "").lower()
+    if host not in YT_HOSTS:
+        die("fetch chỉ nhận link YouTube (https://www.youtube.com/… hoặc https://youtu.be/…); nhận: %s" % url)
+    if host == "youtu.be":
+        vid = p.path.strip("/").split("/")[0]
+    elif p.path == "/watch":
+        vid = (urllib.parse.parse_qs(p.query).get("v") or [""])[0]
+    else:
+        m = re.match(r"^/(?:shorts|live|embed)/([^/]+)", p.path)
+        vid = m.group(1) if m else ""
+    if not VIDEO_ID.fullmatch(vid):
+        die("link phải trỏ tới một video cụ thể (watch?v=…, youtu.be/…, /shorts/…, /live/…); link playlist, kênh không "
+            "nhận: %s" % url)
+    return vid, "https://www.youtube.com/watch?v=" + vid
+
+
+def ytdlp(args, url, cookies):
+    """Chạy yt-dlp (không tải video). Lỗi → dừng, gợi ý cookies khi video cần đăng nhập. → stdout."""
+    cmd = ["yt-dlp", "--skip-download", "--no-playlist"] + args
+    if cookies:
+        cmd += ["--cookies-from-browser", cookies]
+    res = subprocess.run(cmd + ["--", url], capture_output=True, text=True)
+    if res.returncode != 0:
+        errs = [l for l in res.stderr.splitlines() if l.startswith("ERROR")]
+        err = errs[-1] if errs else res.stderr.strip()[-300:]
+        hint = (" — video riêng tư/cần đăng nhập: thêm --cookies-from-browser chrome (trình duyệt đã đăng nhập YouTube)"
+                if re.search(r"(?i)sign in|private|members|login|cookies", err) else "")
+        die("yt-dlp không đọc được video: %s%s" % (err, hint))
+    return res.stdout
+
+
+def cmd_fetch(args):
+    vid, url = youtube_video(args.url)
+    lang = args.lang
+    if not re.fullmatch(r"[a-z]{2,3}(-[A-Za-z]{2,4})?", lang):
+        die("--lang cần mã ngôn ngữ như vi, en, zh-Hans; nhận: %s" % lang)
+    if args.name and (os.sep in args.name or args.name.startswith(".")):
+        die("--name là tên file, không chứa '/' và không bắt đầu bằng '.'")
+    dest = os.path.join(args.out_dir, "%s.%s.vtt" % (args.name or vid, lang))
+    refuse_overwrite(dest)  # trước mọi lần gọi mạng
+    if not shutil.which("yt-dlp"):
+        die("cần yt-dlp để tải phụ đề YouTube — cài: brew install yt-dlp (hoặc pip install yt-dlp), rồi chạy lại")
+    info = (ytdlp(["--print", "%(language)s\t%(title)s"], url, args.cookies_from_browser).strip().split("\n") or [""])[-1]
+    spoken, _, title = info.partition("\t")
+    spoken = "" if spoken in ("NA", "None") else spoken
+    print("Video: %s · ngôn ngữ nói: %s" % (title or vid, spoken or "không rõ (chủ kênh chưa khai)"))
+    translated = bool(spoken) and spoken.split("-")[0] != lang.split("-")[0]
+    if translated and not args.allow_translation:
+        die("video nói %s, khác --lang %s: phụ đề %s (nếu có) là bản dịch — không cắt từ đệm, chuẩn hoá hay tính lại giờ "
+            "trên bản dịch. Lấy lời gốc: --lang %s. Chỉ cần bản dịch để dùng nguyên: thêm --allow-translation"
+            % (spoken, lang, lang, spoken.split("-")[0]))
+    # Phụ đề tự động chỉ nhận bản gốc "<lang>-orig": bản "<lang>" tự động không kèm -orig là dịch máy từ ngôn ngữ khác.
+    tries = [] if args.kind == "auto" else [(False, lang)]
+    tries += [] if args.kind == "manual" or translated else [(True, lang + "-orig")]
+    if not tries:
+        die("video nói %s: không có phụ đề tự động gốc %s-orig — bỏ --kind auto để lấy bản dịch chủ kênh tải lên"
+            % (spoken, lang))
+    tmp = tempfile.mkdtemp(prefix="mk-subtitle-fetch.")
+    try:
+        chosen = None
+        for auto, want in tries:
+            ytdlp(["--sub-format", "vtt", "--sub-langs", want, "--write-auto-subs" if auto else "--write-subs",
+                   "-o", os.path.join(tmp, "%(id)s.%(ext)s")], url, args.cookies_from_browser)
+            hit = sorted(f for f in os.listdir(tmp) if f.endswith(".%s.vtt" % want))
+            if hit:
+                chosen = (auto, want, hit[0])
+                break
+        if not chosen:
+            tried = {a for a, _ in tries}
+            if tried == {False}:
+                die("không có phụ đề %s do chủ kênh tải lên%s" % (lang, "" if translated else
+                                                                   " — bỏ --kind manual để lấy phụ đề tự động gốc"))
+            if tried == {True}:
+                die("không có phụ đề tự động gốc %s-orig — bỏ --kind auto để thử phụ đề chủ kênh tải lên" % lang)
+            die("video không có phụ đề %s do chủ kênh tải lên, cũng không có phụ đề tự động gốc %s-orig — tự tạo phụ đề "
+                "theo references/lay-phu-de.md §3" % (lang, lang))
+        auto, got, fname = chosen
+        refuse_overwrite(dest)
+        os.makedirs(args.out_dir, exist_ok=True)
+        write(dest, read(os.path.join(tmp, fname)))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    kind, words, _ = load(dest)
+    print("Nguồn: %s" % ("phụ đề tự động YouTube (%s)" % got if auto else "phụ đề chủ kênh tải lên (%s)%s" % (
+        got, " — BẢN DỊCH, chỉ dùng nguyên" if spoken and spoken.split("-")[0] != lang.split("-")[0] else "")))
+    print("Loại: %s · %d từ · %s → %s" % (
+        "có mốc từng từ (bản tự động có thể đã lược bớt à, ừ)" if kind == "youtube" else
+        "mốc theo câu — cắt từ đệm giữa câu là ước lượng",
+        len(words), fmt(words[0].start) if words else "-", fmt(words[-1].end) if words else "-"))
+    print("→ %s" % dest)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Xử lý phụ đề SRT/VTT cho khâu dựng video.")
     sub = ap.add_subparsers(dest="cmd", required=True)
     fmt_opts = argparse.ArgumentParser(add_help=False)
     fmt_opts.add_argument("--max-chars", type=int, default=42)
     fmt_opts.add_argument("--max-lines", type=int, default=2)
+
+    p = sub.add_parser("fetch")
+    p.add_argument("url")
+    p.add_argument("--out-dir", required=True)
+    p.add_argument("--lang", default="vi")
+    p.add_argument("--kind", choices=["any", "manual", "auto"], default="any")
+    p.add_argument("--name")
+    p.add_argument("--cookies-from-browser", choices=BROWSERS)
+    p.add_argument("--allow-translation", action="store_true",
+                   help="video nói ngôn ngữ khác --lang: vẫn tải bản dịch chủ kênh tải lên (chỉ để dùng nguyên)")
+    p.set_defaults(fn=cmd_fetch)
 
     p = sub.add_parser("scan")
     p.add_argument("input")

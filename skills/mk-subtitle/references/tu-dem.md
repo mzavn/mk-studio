@@ -11,6 +11,8 @@ Mục tiêu: bỏ tiếng ngập ngừng khỏi phụ đề và cho editor danh 
 
 Phân nhóm là quy tắc máy theo vị trí và dấu câu, không hiểu nghĩa; phụ đề tự động hay thiếu dấu câu nên nhóm A vẫn có thể lẫn chữ mang nghĩa. Agent đọc ngữ cảnh **từng** mã nhóm A trước khi trình; mã nào mang nghĩa (câu đáp, tiếng gọi, cảm thán) → nêu riêng, đề xuất `trừ` mã đó.
 
+Phụ đề tự động YouTube có lúc **lược bớt** âm đệm khi nhận giọng (tuỳ người nói, tuỳ video). Nhóm A = 0 hoặc rất ít trên file tải bằng `fetch` không chứng minh video sạch: báo người dùng điều này, đề nghị nghe thử vài đoạn trước khi kết luận "không có gì để cắt".
+
 ## 2. Khi nào KHÔNG bỏ
 
 - "Ừ"/"Ờ"/"Vâng"/"Dạ" là **câu trả lời** cho câu hỏi ngay trước (đồng ý, xác nhận).
