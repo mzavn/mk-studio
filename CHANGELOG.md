@@ -8,6 +8,17 @@ Mỗi bản có số dạng `X.Y.Z` (chung cho cả bộ skill):
 
 Cập nhật: `bash ~/.mk-studio/install.sh --update`.
 
+## Chưa phát hành
+
+Dự kiến: v0.6.1
+
+### mk-subtitle, mk-video-cutter
+
+**Sửa lỗi**
+
+- **Chạy được trên Windows.** Trước đây trên Windows các script dừng ngay khi in chữ tiếng Việt (lỗi bảng mã). Giờ script luôn in và đọc kết quả ffmpeg, yt-dlp bằng UTF-8; trên macOS và Linux không có gì thay đổi. Trên Windows bạn chạy lệnh trong Git Bash (cài cùng Git for Windows).
+- **Thiếu ffmpeg hoặc yt-dlp** thì thông báo chỉ luôn lệnh cài cho cả macOS (`brew`) và Windows (`winget`).
+
 ## v0.6.0 — 30/10/2026
 
 ### mk-subtitle

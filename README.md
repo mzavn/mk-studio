@@ -103,7 +103,7 @@ Gõ `/mk:video-cutter <file_video.mp4> --sheet <file_action_sheet>`. Skill phân
 
 ## Yêu cầu môi trường
 
-- Hệ điều hành: macOS hoặc Linux (hỗ trợ `bash` 3.2 trở lên).
+- Hệ điều hành: macOS hoặc Linux (hỗ trợ `bash` 3.2 trở lên). Windows: chạy `install.sh` trong Git Bash (đi kèm [Git for Windows](https://git-scm.com/downloads/win)); hiện `mk-subtitle` và `mk-video-cutter` đã xử lý bảng mã cho Windows (in tiếng Việt qua pipe).
 - Python: `python3` ≥ 3.8 (chỉ sử dụng thư viện chuẩn, không cần cài thư viện ngoài).
 - Công cụ: `git`, [GitHub CLI](https://cli.github.com) đã đăng nhập (`gh auth status`), và `ffmpeg` / `ffprobe` (cho tính năng khảo sát âm thanh & cắt video).
 - Coding agent: Bất kỳ agent nào đọc thư mục skill chuẩn (`.claude/skills` hoặc `.agents/skills` như Claude Code, omp, Codex…).
