@@ -12,7 +12,7 @@ Bộ skill kỹ thuật & lập trình đi kèm là **[mk-lab](https://github.co
 |---|---|---|---|
 | **`mk-star`** | `/mk:star` | *"viết nhật ký ngày"*, *"giải quyết vấn đề"*, *"luyện case 05"* | Hệ nhật ký STAR 5 loại: biến cảm xúc/vấn đề/thành công thành quyết định, kế hoạch và tài sản đóng gói. Lưu hoàn toàn ở máy cá nhân (`~/nhat-ky-star/`). |
 | **`mk-exec-review`** | `/mk:exec-review <file>` | *"phản biện bài <đường dẫn>"*, *"đọc bài như CEO"*, *"soát bài"* | Hội đồng C-level (CEO, CFO, CMO, COO, CTO) phản biện bài viết theo chân dung khách hàng thật, bóc giọng văn AI, chuẩn hóa thuật ngữ, tối ưu SEO/GEO/AEO, duyệt từng mã gợi ý trước khi sửa. |
-| **`mk-subtitle`** | `/mk:subtitle <file>` | *"xử lý phụ đề <file>"*, *"cắt ừ à"*, *"chia file con"*, *"cắt bài giảng"* | Phụ đề cho khâu dựng video và chia buổi học dài thành file con: duyệt từ đệm xoá khỏi phụ đề kèm danh sách cắt, chuẩn hoá tiếng Việt, dịch tiếng Anh, lập Bảng lệnh Editor (Action Sheet) cắt rác/giải lao và chia bài giảng 20–30p giữ trọn vẹn ngữ cảnh vấn đáp. |
+| **`mk-subtitle`** | `/mk:subtitle <file hoặc link YouTube>` | *"xử lý phụ đề <file>"*, *"lấy phụ đề youtube"*, *"cắt ừ à"*, *"chia file con"*, *"cắt bài giảng"* | Phụ đề cho khâu dựng video và chia buổi học dài thành file con: tải phụ đề có sẵn từ link YouTube (có mốc từng từ), duyệt từ đệm xoá khỏi phụ đề kèm danh sách cắt, chuẩn hoá tiếng Việt, dịch tiếng Anh, lập Bảng lệnh Editor (Action Sheet) cắt rác/giải lao và chia bài giảng 20–30p giữ trọn vẹn ngữ cảnh vấn đáp. |
 | **`mk-video-cutter`** | `/mk:video-cutter <video>` | *"cắt video"*, *"chia clip con"*, *"bỏ thanh zoom"*, *"video dọc 9:16"*, *"nâng 1080p"*, *"làm nét video"* | Cắt video bài giảng dài thành clip chuyên đề theo Action Sheet: tự cắt viền thừa của video quay màn hình (thanh menu, thanh Zoom, dải đen) có ảnh xem trước để duyệt, xuất khung 16:9 / 9:16 / tuỳ chỉnh ở chuẩn phù hợp nguồn (720p → 1080p), làm nét vừa phải, giữ trọn hình, hoặc giữ nguyên hình gốc; cân bằng âm thanh hai tai, chuẩn âm lượng -16 LUFS, nghiệm thu bằng `ffprobe`. |
 
 > **Lưu ý tên lệnh và quyền:**
@@ -65,7 +65,9 @@ Bộ skill kỹ thuật & lập trình đi kèm là **[mk-lab](https://github.co
 
 ## 3. mk:subtitle — Phụ đề & chia file con cho khâu dựng video
 
-Gõ `/mk:subtitle <file .srt, .vtt hoặc .txt>`. Skill cung cấp hai mode nghiệp vụ:
+Gõ `/mk:subtitle <file .srt, .vtt hoặc .txt>` hoặc đưa **link YouTube**. Skill cung cấp hai mode nghiệp vụ.
+
+**Chưa có phụ đề?** Video đã đăng YouTube (kể cả không công khai) → skill tải phụ đề có sẵn trong vài giây (cần `yt-dlp`), ưu tiên bản chủ kênh tải lên, không có thì bản tự động gốc có mốc từng từ; bản dịch máy bị từ chối. Chỉ có file video → skill không tự nhận giọng, hướng dẫn bạn tự cài whisper.cpp (miễn phí, chạy trên máy) để tạo SRT rồi quay lại.
 
 ### Mode phụ đề (SRT / VTT)
 

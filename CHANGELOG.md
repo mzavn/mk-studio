@@ -8,6 +8,17 @@ Mỗi bản có số dạng `X.Y.Z` (chung cho cả bộ skill):
 
 Cập nhật: `bash ~/.mk-studio/install.sh --update`.
 
+## Chưa phát hành
+
+Dự kiến: v0.6.0
+
+### mk-subtitle
+
+**Mới**
+
+- **Lấy phụ đề từ link YouTube.** Chưa có file phụ đề mà video đã đăng YouTube (kể cả video không công khai) thì đưa link: skill tải phụ đề có sẵn (không tải video) trong vài giây và in tiêu đề, ngôn ngữ nói của video. Ưu tiên phụ đề chủ kênh tải lên; không có thì lấy phụ đề tự động **bản gốc**, có mốc thời gian từng từ để cắt "à, ừ" đúng chỗ (bản tự động có lúc lược bớt âm đệm — skill sẽ nhắc). Video nói ngôn ngữ khác thì phụ đề tiếng Việt là bản dịch: skill dừng và hỏi bạn lấy lời gốc hay chỉ cần bản dịch. Bản tự động dịch máy, link playlist hay link kênh bị từ chối. Video riêng tư: dùng phiên đăng nhập YouTube trên trình duyệt (`--cookies-from-browser`) khi bạn đồng ý. Cần `yt-dlp` trên máy (`brew install yt-dlp`).
+- **Chỉ có file video, chưa đăng đâu:** skill không tự nhận giọng, mà hướng dẫn bạn tự cài whisper.cpp (miễn phí, chạy trên máy, không gửi âm thanh ra ngoài) để tạo file SRT, kèm các lỗi hay gặp: nghe sai tên riêng, từ Hán Việt; bịa câu lặp ở đoạn im lặng dài.
+
 ## v0.5.0 — 30/10/2026
 
 ### mk-video-cutter
