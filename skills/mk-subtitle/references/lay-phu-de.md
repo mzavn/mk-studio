@@ -1,16 +1,19 @@
 # Lấy phụ đề khi người dùng chưa có file SRT/VTT
 
-Đọc khi người dùng đưa link YouTube hoặc chỉ có file video. `S` = `python3 <skill>/scripts/subtitle.py`.
+Đọc khi người dùng đưa link YouTube hoặc chỉ có file video. `S` = `python3 <skill>/scripts/subtitle.py`, `K` = `python3 <skill>/scripts/takes.py`.
 
 ## 1. Thứ tự nguồn
 
 | Ưu tiên | Người dùng có | Làm gì | Ghi chú cho skill |
 |---|---|---|---|
-| 1 | File SRT/VTT | dùng luôn | tuỳ file |
+| 1 | File SRT/VTT, bản chép lời có mốc | dùng luôn | tuỳ file |
 | 2 | Link YouTube (video đã đăng, kể cả không công khai) | `S fetch` (§2) | bản tự động gốc có **mốc từng từ** — cắt đúng chỗ, nhưng có thể đã lược bớt âm đệm (§2) |
-| 3 | Chỉ có file video, chưa đăng YouTube | người dùng **tự cài** công cụ nhận giọng (§3), hoặc tự đăng không công khai rồi quay lại mục 2 | mốc theo câu; tên riêng, từ Hán Việt hay sai |
+| 3 | Chỉ có file video, người dùng **đồng ý rõ** gửi âm thanh lên Google (câu hỏi riêng, không mặc định) | Gemini qua `agy` chép lời từng cụm, mốc đo trên âm thanh (`references/video-kich-ban.md` §3, C1–C3) | không cài gì, tốn quota agy; video ngắn (khoảng ≤ 15 phút); mốc theo cụm lời |
+| 4 | Chỉ có file video, không gửi lên mạng, hoặc máy đã có model | model nhận giọng trên máy (§3) — người dùng tự cài | mốc theo câu; tên riêng, từ Hán Việt hay sai |
 
-Video đã có trên YouTube thì ưu tiên mục 2, kể cả khi người dùng có sẵn file video: vài giây, không tốn máy, có mốc từng từ. Người dùng có bản chép lời `.txt` sao từ trang YouTube (mốc theo đoạn khoảng 30 giây) mà có link → đề xuất tải lại bằng `fetch`.
+Video đã có trên YouTube thì ưu tiên mục 2, kể cả khi người dùng có sẵn file video: vài giây, không tốn máy, không tốn quota, có mốc từng từ. Người dùng có bản chép lời `.txt` sao từ trang YouTube (mốc theo đoạn khoảng 30 giây) mà có link → đề xuất tải lại bằng `fetch`.
+
+Mục 3: chỉ model **Gemini** của `agy` nghe được âm thanh; Claude/GPT (trong `agy`, Claude Code, Codex) không nghe được — không giao việc chép lời cho chúng. Gemini CLI (`gemini`) đã ngừng cho tài khoản cá nhân. **Không dùng mốc thời gian Gemini tự đưa** (lệch, giãn): mốc luôn đo bằng `K segments`.
 
 ## 2. Tải phụ đề YouTube — `S fetch`
 
@@ -30,11 +33,11 @@ S fetch "<link YouTube>" --out-dir <thư mục> [--name <tên>] [--lang vi] [--k
 
 Dòng in ra: `Video: <tiêu đề> · ngôn ngữ nói: …`, `Nguồn: …`, `Loại: có mốc từng từ` hoặc `mốc theo câu`, `→ <đường dẫn>`. File ra `<thư mục>/<tên>.<lang>.vtt`, dùng ngay cho `S scan` (mode phụ đề) hoặc `L scan` (mode chia buổi).
 
-## 3. Chỉ có file video: người dùng tự tạo phụ đề
+## 3. Chỉ có file video: ngoài đường agy
 
-Skill **không có sẵn** và **không tự cài** công cụ nhận giọng. Đưa người dùng hai lựa chọn, họ tự quyết:
+Người dùng không muốn gửi âm thanh lên Gemini (mục 3 ở §1) → skill **không có sẵn** và **không tự cài** công cụ nhận giọng. Đưa hai lựa chọn, họ tự quyết:
 
-**A. Đăng YouTube ở chế độ không công khai** (unlisted), chờ YouTube tạo phụ đề tự động (thường vài phút tới vài giờ với video dài), rồi dùng `fetch` như §2. Không cần cài gì; đổi lại video nằm trên YouTube — nội dung nội bộ/nhạy cảm thì cân nhắc.
+**A. Đăng YouTube ở chế độ không công khai** (unlisted), chờ YouTube tạo phụ đề tự động (thường vài phút tới vài giờ với video dài), rồi dùng `fetch` như §2. Không cần cài gì; đổi lại video nằm trên YouTube (cũng là gửi cho Google) — nội dung nội bộ/nhạy cảm thì cân nhắc.
 
 **B. Nhận giọng trên máy bằng whisper.cpp** (miễn phí, chạy tốt trên Mac Apple Silicon, không gửi âm thanh ra ngoài):
 
