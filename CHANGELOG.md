@@ -8,9 +8,7 @@ Mỗi bản có số dạng `X.Y.Z` (chung cho cả bộ skill):
 
 Cập nhật: `bash ~/.mk-studio/install.sh --update`.
 
-## Chưa phát hành
-
-Dự kiến: v0.8.0
+## v0.8.0 — 31/10/2026
 
 ### mk-subtitle
 

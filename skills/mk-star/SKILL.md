@@ -4,7 +4,7 @@ description: 'STAR journaling coach in Vietnamese: five journal types (I Daily D
 license: MIT
 metadata:
   author: mzavn
-  version: "0.7.0"
+  version: "0.8.0"
 ---
 
 # mk:star — Hệ nhật ký STAR (5 loại)
