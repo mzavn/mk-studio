@@ -221,6 +221,12 @@ class EditRoundTrip(Base):
             self.assertIn(msg, res.stderr)
             self.assertFalse(os.path.exists(self.path("x.srt")))
 
+    def test_bo_ca_cau_bang_dong_danh_dau_giu_moc_cau_con_lai(self):
+        self.path("drop.md", self.read("t.md").replace("bí trích", "[bỏ câu]"))
+        out = self.ok("build", self.srt, "--text", self.path("drop.md"), "--out", self.path("vi2.srt"))
+        self.assertIn("bỏ cue [1]", out)
+        self.assertEqual(self.read("vi2.srt"), "1\n00:00:04,000 --> 00:00:06,000\nmở thêm quán\n\n")
+
 
 class Check(Base):
     def test_overlap_and_reference_mismatch_fail_while_reading_speed_only_warns(self):
@@ -268,6 +274,43 @@ class Glossary(Base):
         self.assertIn("- Lead ← list: 1", out)
         self.assertIn("- funnel ← funel: 1", out)
         self.assertNotIn("phễu:", out)
+
+
+class Reflow(Base):
+    def blocks(self, name):
+        return [b.split("\n") for b in self.read(name).strip().split("\n\n")]
+
+    def test_cau_dai_tach_vua_kho_doc_thoi_gian_lien_mach_khong_mat_chu(self):
+        text = ("Có những ngày đôi khi chúng ta đã thay quần áo, chuẩn bị giày dép, nhưng bước chân ra khỏi nhà "
+                "vẫn là một việc rất khó khăn.")
+        src = self.path("vi.srt", "1\n00:00:01,000 --> 00:00:09,000\n%s\n\n" % text)
+        self.ok("reflow", src, "--max-chars", "26", "--out", self.path("doc.srt"))
+        blocks = self.blocks("doc.srt")
+        self.assertGreaterEqual(len(blocks), 2)
+        times = [b[1].split(" --> ") for b in blocks]
+        self.assertEqual((times[0][0], times[-1][1]), ("00:00:01,000", "00:00:09,000"))
+        self.assertTrue(all(times[k][1] == times[k + 1][0] for k in range(len(times) - 1)))
+        lines = [l for b in blocks for l in b[2:]]
+        self.assertTrue(all(len(l) <= 26 for l in lines) and all(len(b) <= 4 for b in blocks), blocks)
+        self.assertEqual(" ".join(lines).split(), text.split())
+        ends = [(a.split()[-1], b.split()[0]) for a, b in zip(lines, lines[1:])]
+        self.assertNotIn(("đôi", "khi"), ends)       # cặp chữ đi liền không bị tách
+        self.assertNotIn(("chúng", "ta"), ends)
+
+    def test_cau_da_vua_kho_giu_nguyen_cho_xuong_dong_sua_tay(self):
+        src = self.path("vi.srt", "1\n00:00:01,000 --> 00:00:04,000\nHôm nay mình\nnói về chạy bộ.\n\n")
+        self.ok("reflow", src, "--max-chars", "26", "--out", self.path("doc.srt"))
+        self.assertEqual(self.blocks("doc.srt")[0][2:], ["Hôm nay mình", "nói về chạy bộ."])
+
+    def test_doc_qua_nhanh_chi_canh_bao_va_khong_ghi_de(self):
+        src = self.path("vi.srt", "1\n00:00:01,000 --> 00:00:01,600\nmột câu đọc không kịp\n\n")
+        out = self.ok("reflow", src, "--out", self.path("doc.srt"))
+        self.assertIn("ký tự/giây", out)
+        self.assertIn("hiện 0.60 giây", out)
+        res = run("reflow", src, "--out", self.path("doc.srt"))
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("đã có", res.stderr)
+
 
 
 if __name__ == "__main__":

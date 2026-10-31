@@ -7,9 +7,10 @@
   subtitle.py clean IN --fillers FILLERS.tsv --approve "A,F012,F020-F025" [--reject "F007"]
                        --out-srt OUT.srt --out-cuts PREFIX [--max-chars 42 --max-lines 2 --max-dur 6 --min-dur 1]
   subtitle.py export SRT --out TEXT.md
-  subtitle.py build SRT --text TEXT.md --out OUT.srt
+  subtitle.py build SRT --text TEXT.md --out OUT.srt          (chữ một khối ghi đúng "[bỏ câu]" → bỏ cue đó)
   subtitle.py check SRT [--ref REF.srt] [--lang vi|en] [--max-chars 42 --max-lines 2 --max-cps 20 --min-dur 0.7]
   subtitle.py retime SRT --cuts PREFIX.csv --out OUT.srt
+  subtitle.py reflow SRT --out OUT.srt [--max-chars 42|26 --max-lines 2 --max-cps 17 --min-dur 0.83]
 
 Đầu vào: SRT; VTT thường; VTT tự động của YouTube (có mốc thời gian từng từ — cắt chính xác, chia lại câu).
 fetch: tải phụ đề có sẵn của video YouTube bằng yt-dlp (không tải video) → DIR/<tên>.<lang>.vtt; ưu tiên phụ đề chủ kênh
@@ -337,22 +338,104 @@ def pick(rows, approve, reject):
 
 # ---------------------------------------------------------------- chia câu, ngắt dòng
 
-def wrap(text, max_chars, max_lines):
+# Ngắt dòng tiếng Việt (Netflix tiếng Việt §11, chung §4): vừa một dòng thì để một dòng; hai dòng thì ngắt sau dấu
+# câu, trước liên từ/giới từ; không để 1–2 chữ lẻ ở dòng trên; dòng dưới dài hơn (tam giác đáy rộng); không tách
+# số khỏi đơn vị, chữ phủ định/trợ từ/lượng từ khỏi chữ sau, họ khỏi tên.
+CONJ = {"và", "nhưng", "mà", "thì", "vì", "nên", "để", "khi", "nếu", "hay", "hoặc", "còn", "tuy", "dù", "bởi", "chứ",
+        "rằng"}
+PREP = {"là", "với", "cho", "của", "trong", "ngoài", "trên", "dưới", "từ", "đến", "tới", "bằng", "như", "do", "sau",
+        "trước", "mặc", "ngay"}
+BREAK_BEFORE = CONJ | PREP
+NO_BREAK_AFTER = {"không", "chưa", "chẳng", "đừng", "chớ", "đã", "đang", "sẽ", "được", "bị", "rất", "hơi", "quá",
+                  "các", "những", "mọi", "mỗi", "một", "cái", "con", "chiếc", "vừa", "mới", "cũng", "đều", "vẫn",
+                  "lại", "hãy", "phải", "có"}
+PRONOUN = {"tôi", "ta", "chúng", "mình", "họ", "anh", "chị", "em", "bạn", "nó", "ai"}
+PHRASE_START = NO_BREAK_AFTER | PRONOUN | {"cần", "nên", "muốn", "biết"}
+# Cặp chữ hay đi liền mà chữ sau lại nằm trong nhóm được thưởng khi ngắt trước nó.
+NO_BREAK_PAIRS = {("đôi", "khi"), ("trước", "khi"), ("sau", "khi"), ("trong", "khi"), ("từ", "khi"), ("đến", "khi"),
+                  ("tới", "khi"), ("chúng", "ta"), ("chúng", "tôi"), ("chúng", "mình"), ("bọn", "mình"),
+                  ("bởi", "vì"), ("tại", "vì"), ("cho", "nên"), ("vì", "vậy"), ("vì", "thế"), ("như", "vậy"),
+                  ("mặc", "dù"), ("tuy", "nhiên"), ("ngay", "cả"), ("cho", "đến"), ("cho", "tới"), ("có", "thể"),
+                  ("có", "lẽ"), ("nhưng", "mà"), ("thế", "nhưng"), ("hay", "là"), ("hoặc", "là")}
+FUNCTION_WORDS = BREAK_BEFORE | PHRASE_START
+
+
+def break_cost(prev, nxt):
+    """Phạt (+) / thưởng (−) cho chỗ ngắt giữa hai chữ, tính bằng 'số ký tự'."""
+    p, n = norm(prev), norm(nxt)
+    cost = 0
+    if prev.endswith(SENT_END):
+        cost -= 10
+    elif prev.endswith(CLAUSE_END):
+        cost -= 6
+    elif p in BREAK_BEFORE or p in NO_BREAK_AFTER:
+        cost += 15  # để trơ liên từ, chữ phủ định, trợ từ ở cuối dòng
+    elif re.search(r"\d", prev) and n[:1].isalpha():
+        cost += 15  # "30 | phút", "2,5 | triệu"
+    elif prev[:1].isupper() and nxt[:1].isupper():
+        cost += 15  # họ | tên
+    if not prev.endswith(SENT_END + CLAUSE_END):
+        cost -= 8 if n in CONJ else 4 if n in PREP else 3 if n in PHRASE_START else 0
+        if p not in FUNCTION_WORDS and n not in FUNCTION_WORDS:
+            cost += 20  # hai chữ nội dung liền nhau: hay là một từ ghép ("thể | thao", "tiến | bộ")
+    if (p, n) in NO_BREAK_PAIRS:
+        cost += 25
+    return cost
+
+
+def wrap_scored(text, max_chars, max_lines):
+    """→ (số ký tự vượt khổ, điểm phạt chỗ xuống dòng, [dòng]). Một dòng nếu vừa; không thì hai dòng tốt nhất."""
     if len(text) <= max_chars or max_lines < 2:
-        return [text]
+        return max(0, len(text) - max_chars), 0, [text]
     toks = text.split()
     best = None
     for k in range(1, len(toks)):
         a, b = " ".join(toks[:k]), " ".join(toks[k:])
         over = max(0, len(a) - max_chars) + max(0, len(b) - max_chars)  # vượt độ dài dòng: tránh trước tiên
-        score = (over, max(len(a), len(b)) - (6 if toks[k - 1].endswith(CLAUSE_END + SENT_END) else 0))
-        if best is None or score < best[0]:
-            best = (score, [a, b])
-    return best[1] if best else [text]
+        penalty = break_cost(toks[k - 1], toks[k])
+        penalty += max(0, len(a) - len(b)) * 1.5   # dòng trên dài hơn dòng dưới
+        penalty += 12 if k <= 2 else 0             # 1–2 chữ lẻ ở dòng trên
+        penalty += 8 if len(toks) - k == 1 else 0  # một chữ lẻ ở dòng dưới
+        key = (over, max(len(a), len(b)) + penalty, k)
+        if best is None or key < best[0]:
+            best = (key, penalty, [a, b])
+    return (best[0][0], best[1], best[2]) if best else (len(text), 0, [text])
+
+
+def wrap(text, max_chars, max_lines):
+    return wrap_scored(text, max_chars, max_lines)[2]
+
+
+def chunk(text, max_chars, max_lines):
+    """Chữ dài hơn một câu phụ đề → [[dòng]…]: chia ít câu nhất, mỗi câu vừa max_lines × max_chars; trong số cách chia
+    đó tránh câu quá ngắn (một chữ lẻ) và ưu tiên cắt ở cuối câu > dấu phẩy > trước liên từ/giới từ."""
+    toks = text.split()
+    n, cap = len(toks), max_chars * max_lines
+    best, back = [0.0] + [float("inf")] * n, [0] * (n + 1)
+    for j in range(1, n + 1):
+        for i in range(j - 1, -1, -1):
+            piece = " ".join(toks[i:j])
+            if j - i > 1 and len(piece) > cap:
+                break
+            over, penalty, _ = wrap_scored(piece, max_chars, max_lines)
+            if j - i > 1 and over:
+                continue
+            cost = 100 + max(0.0, 0.35 * cap - len(piece)) * 3 + penalty  # chỗ xuống dòng bên trong câu cũng tính
+            if j < n:
+                end = toks[j - 1]
+                cost += (0 if end.endswith(SENT_END) else 15 if end.endswith(CLAUSE_END)
+                         else 30 + break_cost(end, toks[j]))
+            if best[i] + cost < best[j]:
+                best[j], back[j] = best[i] + cost, i
+    cuts, j = [], n
+    while j > 0:
+        cuts.append((back[j], j))
+        j = back[j]
+    return [wrap(" ".join(toks[i:j]), max_chars, max_lines) for i, j in reversed(cuts)]
 
 
 def fits(text, max_chars, max_lines):
-    return all(len(line) <= max_chars for line in wrap(text, max_chars, max_lines))
+    return wrap_scored(text, max_chars, max_lines)[0] == 0
 
 
 def segment(words, max_chars, max_lines, max_dur, min_dur):
@@ -620,6 +703,9 @@ def cmd_export(args):
     print("%d cue → %s (sửa chữ dưới mỗi dòng [số], giữ nguyên dòng [số] và mốc thời gian)" % (len(cues), args.out))
 
 
+DROP = "[bỏ câu]"
+
+
 def cmd_build(args):
     refuse_overwrite(args.out)
     cues = cues_of(args.input)
@@ -634,18 +720,25 @@ def cmd_build(args):
         got.append((n, a, b, lines))
     if len(got) != len(cues):
         die("%s có %d khối, phụ đề gốc có %d cue — không thêm/bớt cue" % (args.text, len(got), len(cues)))
-    changed = 0
+    changed, dropped = 0, []
     for idx, ((n, a, b, lines), c) in enumerate(zip(got, cues), 1):
         if n != idx:
             die("khối thứ %d mang số [%d] — giữ nguyên thứ tự và số" % (idx, n))
         if (a, b) != (c.start, c.end):
             die("cue [%d] đổi mốc thời gian (%s --> %s) — chỉ được sửa chữ" % (n, fmt(a), fmt(b)))
         if not lines:
-            die("cue [%d] trống chữ" % n)
+            die("cue [%d] trống chữ (muốn bỏ cả câu thì ghi đúng một dòng %s)" % (n, DROP))
+        if lines == [DROP]:
+            dropped.append(n)
+            continue
         changed += lines != c.lines
         c.lines = lines
-    write(args.out, srt(cues))
-    print("%d cue (%d cue đổi chữ) → %s" % (len(cues), changed, args.out))
+    keep = [c for i, c in enumerate(cues, 1) if i not in dropped]
+    if not keep:
+        die("bỏ hết mọi cue — không còn gì để ghi")
+    write(args.out, srt(keep))
+    print("%d cue (%d cue đổi chữ%s) → %s" % (len(keep), changed, ", bỏ cue %s" % " ".join(
+        "[%d]" % n for n in dropped) if dropped else "", args.out))
 
 
 def vietnamese(text):
@@ -702,6 +795,40 @@ def cmd_check(args):
         print("cảnh báo … còn %d dòng (thêm --limit để xem hết)" % (len(warns) - args.limit))
     print("Tổng: %d lỗi · %d cảnh báo" % (len(errors), len(warns)))
     sys.exit(1 if errors else 0)
+
+
+def cmd_reflow(args):
+    """SRT/VTT có sẵn → ngắt lại theo khổ (vd video dọc 26 ký tự, nhập CapCut): câu đã vừa khổ giữ nguyên dòng (kể cả
+    chỗ xuống dòng đã sửa tay); câu dài tách thành nhiều câu, mốc chia theo số ký tự trong khoảng của câu gốc."""
+    refuse_overwrite(args.out)
+    cues = cues_of(args.input)
+    if not cues:
+        die("%s không có cue nào" % args.input)
+    out, split = [], 0
+    for c in cues:
+        lines = [l.strip() for l in c.lines if l.strip()]
+        if not lines:
+            continue
+        if len(lines) <= args.max_lines and all(len(l) <= args.max_chars for l in lines):
+            out.append(Cue(c.start, c.end, lines))
+            continue
+        parts = chunk(" ".join(lines), args.max_chars, args.max_lines)
+        split += len(parts) > 1
+        total = sum(len(" ".join(p)) for p in parts) or 1
+        t = c.start
+        for k, p in enumerate(parts):
+            e = c.end if k == len(parts) - 1 else t + round((c.end - c.start) * len(" ".join(p)) / total)
+            out.append(Cue(t, e, p))
+            t = e
+    _, warns = check_cues(out, args.max_chars, args.max_lines, args.max_cps, int(args.min_dur * 1000))
+    write(args.out, srt(out))
+    print("%d câu → %d câu (%d câu dài được tách) → %s · tối đa %d dòng × %d ký tự" % (
+        len(cues), len(out), split, args.out, args.max_lines, args.max_chars))
+    print("Rà chỗ xuống dòng: không tách từ ghép (references/chen-phu-de.md §1)")
+    for w in warns[:args.limit]:
+        print("cảnh báo " + w)
+    if len(warns) > args.limit:
+        print("cảnh báo … còn %d dòng" % (len(warns) - args.limit))
 
 
 def cmd_retime(args):
@@ -893,6 +1020,14 @@ def main(argv=None):
     p.add_argument("--cuts", required=True)
     p.add_argument("--out", required=True)
     p.set_defaults(fn=cmd_retime)
+
+    p = sub.add_parser("reflow", parents=[fmt_opts])
+    p.add_argument("input")
+    p.add_argument("--out", required=True)
+    p.add_argument("--max-cps", type=float, default=17)
+    p.add_argument("--min-dur", type=float, default=0.83)
+    p.add_argument("--limit", type=int, default=30)
+    p.set_defaults(fn=cmd_reflow)
 
     args = ap.parse_args(argv)
     args.fn(args)

@@ -4,7 +4,7 @@
 Chỉ thư viện chuẩn + ffmpeg/ffprobe; đầu ra tất định; không sửa, không ghi đè file có sẵn.
 
   takes.py segments VIDEO --out-dir DIR [--threshold auto|-50] [--min-gap 0.25] [--merge-gap 0.4] [--max-chunk 6]
-  takes.py srt DIR/segments.tsv --texts TEXTS [--texts TEXTS_BO_SUNG] --out FILE.srt
+  takes.py srt DIR/segments.tsv --texts TEXTS [--texts TEXTS_BO_SUNG] --out FILE.srt [--max-chars 42|26 --max-lines 2]
   takes.py texts DIR/segments.tsv --from SUB.srt|SUB.vtt --out TEXTS
   takes.py retakes DIR/segments.tsv --texts TEXTS [--texts TEXTS_BO_SUNG] --out PLAN.tsv
   takes.py cut VIDEO --plan PLAN.tsv --out FINAL.mp4 [--srt FULL.srt --out-srt FINAL.srt] [--dry-run]
@@ -250,17 +250,6 @@ def write_new(path, text):
 
 # ---------------------------------------------------------------- phụ đề
 
-def wrap(text, width=42):
-    lines, cur = [], ""
-    for w in text.split():
-        if cur and len(cur) + 1 + len(w) > width:
-            lines.append(cur)
-            cur = w
-        else:
-            cur = (cur + " " + w).strip()
-    return lines + ([cur] if cur else [])
-
-
 def finish_cues(items, total):
     """items: [(bắt đầu, kết thúc, [dòng])] giây → [Cue] ms: lùi 0,05 s, kéo dài 0,3 s, tối thiểu 0,8 s, không chồng."""
     out = []
@@ -278,10 +267,9 @@ def cmd_srt(args):
     st.refuse_overwrite(args.out)
     items = []
     for code, a, b in segs:
-        lines = wrap(texts[code])
-        if not lines:
+        if not texts[code]:
             continue
-        groups = [lines[i:i + 2] for i in range(0, len(lines), 2)]
+        groups = st.chunk(texts[code], args.max_chars, args.max_lines)
         total = sum(len(" ".join(g)) for g in groups)
         t = a
         for g in groups:
@@ -500,7 +488,7 @@ def cmd_cut(args):
         st.die("cần --out <file final.mp4>")
     st.refuse_overwrite(*[p for p in (args.out, args.out_srt) if p])
     root, ext = os.path.splitext(args.out)
-    tmp, bad = root + ".dang-ghi" + (ext or ".mp4"), root + ".loi" + (ext or ".mp4")
+    tmp = root + ".dang-ghi" + (ext or ".mp4")
     st.refuse_overwrite(tmp)
     total = sum(b - a for a, b in keep)
     parts, labels = [], ""
@@ -527,24 +515,42 @@ def cmd_cut(args):
         if os.path.lexists(tmp):
             os.remove(tmp)  # file dở do chính lệnh này tạo
         st.die("ffmpeg lỗi khi cắt: %s" % res.stderr.strip()[-400:])
-    got, _ = probe(tmp)
-    if abs(got - total) > 0.1:
-        if not os.path.lexists(bad):
-            os.replace(tmp, bad)
-        st.die("thời lượng %s lệch dự kiến %s — không giao; file để ở %s" % (
-            tc(got), tc(total), bad if not os.path.lexists(tmp) else tmp))
-    try:
-        os.link(tmp, args.out)  # thất bại nếu file đích vừa xuất hiện trong lúc mã hoá
-        os.remove(tmp)
-    except FileExistsError:
-        st.die("%s vừa xuất hiện trong lúc cắt — không ghi đè; bản mới để ở %s" % (args.out, tmp))
-    except OSError:
-        if os.path.lexists(args.out):
-            st.die("%s vừa xuất hiện trong lúc cắt — không ghi đè; bản mới để ở %s" % (args.out, tmp))
-        os.replace(tmp, args.out)
+    got = deliver(tmp, args.out, total, "cắt")
     print("→ %s · %s" % (args.out, tc(got)))
     if args.srt:
         remap_to(args.srt, args.out_srt, keep)
+
+
+def duration_of(path):
+    res = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", arg_path(path)],
+                         capture_output=True, text=True, encoding="utf-8", errors="replace")
+    try:
+        return float(json.loads(res.stdout)["format"]["duration"])
+    except (ValueError, KeyError):
+        st.die("không đọc được thời lượng %s: %s" % (path, res.stderr.strip()[-300:]))
+
+
+def deliver(tmp, out, expected, what):
+    """File vừa mã hoá (tmp) → tên chính thức (out) chỉ khi thời lượng khớp dự kiến (±0,1 s); lệch → để ở
+    <tên>.loi.<đuôi>. Không ghi đè file đích vừa xuất hiện trong lúc mã hoá. → thời lượng thật."""
+    root, ext = os.path.splitext(out)
+    bad = root + ".loi" + (ext or ".mp4")
+    got = duration_of(tmp)
+    if abs(got - expected) > 0.1:
+        if not os.path.lexists(bad):
+            os.replace(tmp, bad)
+        st.die("thời lượng %s lệch dự kiến %s — không giao; file để ở %s" % (
+            tc(got), tc(expected), bad if not os.path.lexists(tmp) else tmp))
+    try:
+        os.link(tmp, out)  # thất bại nếu file đích vừa xuất hiện trong lúc mã hoá
+        os.remove(tmp)
+    except FileExistsError:
+        st.die("%s vừa xuất hiện trong lúc %s — không ghi đè; bản mới để ở %s" % (out, what, tmp))
+    except OSError:
+        if os.path.lexists(out):
+            st.die("%s vừa xuất hiện trong lúc %s — không ghi đè; bản mới để ở %s" % (out, what, tmp))
+        os.replace(tmp, out)
+    return got
 
 
 def remap_to(src, dst, keep):
@@ -571,6 +577,8 @@ def main(argv=None):
     p.add_argument("segments")
     p.add_argument("--texts", required=True, action="append")
     p.add_argument("--out", required=True)
+    p.add_argument("--max-chars", type=int, default=42, help="ký tự mỗi dòng: 42 video ngang, 26 video dọc")
+    p.add_argument("--max-lines", type=int, default=2)
     p.set_defaults(fn=cmd_srt)
     p = sub.add_parser("texts", help="đã có phụ đề → lời từng cụm theo mốc")
     p.add_argument("segments")

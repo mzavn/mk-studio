@@ -12,9 +12,9 @@ Mục tiêu: chữ trên màn hình đúng điều người nói, đọc kịp, 
 
 ## 2. Ngắt dòng
 
-- Tối đa 2 dòng, mỗi dòng ≤ 42 ký tự (kể cả dấu cách). Script đã chia sẵn; sửa chữ làm dòng dài ra → ngắt lại.
-- Ngắt sau dấu câu nếu được; hai dòng dài gần bằng nhau, dòng dưới có thể dài hơn.
-- Không tách: tên riêng nhiều tiếng, số với đơn vị ("15 %"), cụm động từ ngắn ("đi rồi"), giới từ khỏi danh từ theo sau ("của / chị Lan" → không).
+- Tối đa 2 dòng, mỗi dòng ≤ 42 ký tự với video ngang, ≤ 26 với video dọc (kể cả dấu cách; khổ dòng: `references/chen-phu-de.md` §1). Script đã chia sẵn; sửa chữ làm dòng dài ra → ngắt lại.
+- Ngắt sau dấu câu, trước liên từ/giới từ; dòng dưới dài hơn dòng trên, không để 1–2 chữ lẻ ở dòng trên.
+- Không tách: tên riêng nhiều tiếng, số với đơn vị ("15 %"), cụm động từ ngắn ("đi rồi"), giới từ khỏi danh từ theo sau ("của / chị Lan" → không), **từ ghép** ("thể / thao", "tiến / bộ" → không; script không có từ điển nên agent rà từng câu hai dòng).
 - Không đổi cách chia cue (đã chia theo câu và quãng nghỉ, khớp mốc thời gian). Cue có hai người nói ở dạng hội thoại (`- Thế à?` / `- Ừ, đúng rồi.`): giữ mỗi người một dòng, giữ dấu `- `.
 
 ## 3. Nhịp đọc

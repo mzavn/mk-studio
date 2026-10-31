@@ -131,6 +131,22 @@ class TestSrt(Base):
         self.assertIn("đã có", self.fail_("srt", seg, "--texts", tx, "--out", out_srt))
         self.assertEqual(read(out_srt), "cũ")
 
+    def test_kho_doc_26_ky_tu_ngat_tu_nhien_khong_chu_le(self):
+        seg = self.segments_tsv([(1.0, 9.0)], 10)
+        said = ("Có những ngày anh Nguyễn Văn Minh chạy được 30 phút đầu rất nhẹ nhàng nhưng buổi chiều thì "
+                "mệt hơn hẳn.")
+        out_srt = self.path("vi.srt")
+        self.ok("srt", seg, "--texts", self.texts([said]), "--out", out_srt, "--max-chars", "26")
+        blocks = [b.split("\n")[2:] for b in read(out_srt).strip().split("\n\n")]
+        lines = [l for b in blocks for l in b]
+        self.assertTrue(all(len(l) <= 26 and len(b) <= 2 for b in blocks for l in b), blocks)
+        self.assertEqual(" ".join(lines).split(), said.split())          # không mất, không đảo chữ
+        self.assertTrue(all(len(" ".join(b).split()) >= 3 for b in blocks), blocks)  # không câu chữ lẻ
+        joined = "\n".join(lines)
+        for keep in ("Nguyễn Văn Minh", "30 phút"):
+            self.assertIn(keep, joined)                                  # họ tên, số + đơn vị không bị tách
+        self.assertTrue(any(l.startswith("nhưng") for l in lines), blocks)  # ngắt trước liên từ
+
 
 class TestTextsFromSubtitle(Base):
     def test_chia_chu_phu_de_co_san_vao_tung_cum_theo_moc(self):
