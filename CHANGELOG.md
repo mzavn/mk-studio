@@ -8,6 +8,22 @@ Mỗi bản có số dạng `X.Y.Z` (chung cho cả bộ skill):
 
 Cập nhật: `bash ~/.mk-studio/install.sh --update`.
 
+## Chưa phát hành
+
+Dự kiến: v0.8.0
+
+### mk-subtitle
+
+**Mới**
+
+- **Phụ đề đẹp ngay từ lúc tạo.** File `.srt` skill tạo ra đã ngắt dòng theo khổ video: video ngang tối đa 42 ký tự mỗi dòng, video dọc 26. Câu xuống dòng ở chỗ tự nhiên (sau dấu câu, trước "và", "nhưng"…), không tách "30 phút", họ tên hay "chúng ta", không để một chữ lẻ thành một câu riêng. Bạn nhập thẳng file vào CapCut Desktop hoặc CapCut Web để hậu kỳ tiếp. Đã có sẵn file `.srt` khổ ngang mà cần cho video dọc: nói "ngắt lại phụ đề này cho video dọc" là có bản mới, không cần in vào video.
+- **In phụ đề vào video (tuỳ chọn).** Bảo skill "in phụ đề vào video" là có bản đăng luôn:
+  - Đặt chữ trong vùng an toàn của TikTok, YouTube Shorts (mặc định cho video dọc), Reels, hoặc YouTube với video ngang, để nút bấm và chữ mô tả của app không che phụ đề.
+  - Đo vị trí mặt người nói (macOS) và đặt phụ đề tránh mặt; không còn chỗ dưới mặt thì đưa lên trên đầu.
+  - Chọn font (mặc định Arial, đủ dấu tiếng Việt), cỡ chữ, viền hoặc nền mờ, kiểu một dòng chữ to cho video dọc.
+  - Có ảnh xem trước vùng phụ đề và ảnh mẫu có chữ thật để bạn duyệt trước khi in.
+  - Cần ffmpeg có libass: macOS `brew install ffmpeg-full`; trên Windows, bản `winget install Gyan.FFmpeg` đã có sẵn.
+
 ## v0.7.0 — 30/10/2026
 
 ### mk-subtitle
