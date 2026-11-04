@@ -8,6 +8,55 @@ Mỗi bản có số dạng `X.Y.Z` (chung cho cả bộ skill):
 
 Cập nhật: `bash ~/.mk-studio/install.sh --update`.
 
+## Chưa phát hành
+
+Dự kiến: v0.9.0
+
+### mk-kaizen
+
+**Mới**
+
+- **Skill `mk:kaizen` — luật riêng của dự án.** Khi bạn sửa cách agent làm ("tên file phải là `Buổi N_P0Y`"), nói "lần sau nhớ" hay chốt một quyết định, agent đề xuất mục mới bằng mã `K-mới-1…` với đúng câu sẽ ghi; chỉ mục bạn gọi tên mã mới được ghi vào `KAIZEN.md` của dự án. Xem luật đang áp cho từng skill, kiểm định dạng, bỏ luật hoặc đánh dấu luật đã vào skill. Luật lặp ở từ 2 dự án hoặc ghi là lỗi từ 3 lần trở lên thành đề xuất đưa thẳng vào skill. Cài: `bash ~/.mk-studio/install.sh --global --skill mk-kaizen`.
+
+### mk-thumbnail
+
+**Mới**
+
+- **Skill `mk:thumbnail` — thumbnail YouTube cho cả chuỗi bài giảng theo một khuôn.** Gõ `/mk:thumbnail <thư mục video>`: nhãn `Buổi 2 · P03` và tiêu đề lấy từ tên file (không mở video), bạn sửa tiêu đề trong `thumbnail.tsv` (`|` xuống dòng, `*chữ*` tô vàng). Nền là ảnh của bạn: muốn nền AI thì skill viết sẵn file prompt, bạn tạo ảnh bằng công cụ bất kỳ rồi bỏ vào `nen/` (skill không gọi API ảnh, không lưu khoá); không có ảnh thì dùng nền bát quái vẽ sẵn. Chân dung đã tách nền được ghép nguyên dáng (tách nền bằng Paint trên Windows 11, Preview hoặc Photos trên macOS), ảnh thường được cắt vào khung tròn. Ra JPG 1280×720 dưới 2 MB, tuỳ chọn bản dọc 1080×1920; thêm ảnh sau thì `plan --update` giữ nguyên tiêu đề bạn đã sửa. Chạy offline, cần ffmpeg có libass. Cài: `bash ~/.mk-studio/install.sh --global --skill mk-thumbnail`.
+
+### mk-subtitle
+
+**Mới**
+
+- **Tải video nguồn theo chuẩn khoá** (`fetch-video`): mặc định 720p 30 khung/giây, H.264 + AAC, không ghi đè; đưa video buổi trước làm mẫu thì skill báo ngay chỗ lệch độ phân giải, khung hình, codec.
+- **Một tên cho mọi đầu ra.** Bảng lệnh Editor, phụ đề và video con dùng chung một mẫu tên, vd `Buổi 6_P01 - <Tiêu đề>`, tự suy từ các file đã có trong `VIDEO/FINAL/` hoặc đặt bằng `--name`; nhãn hiển thị đặt bằng `--label`. Tiêu đề có `:` hay `?` được đổi sang dạng hợp lệ cho tên file.
+- **File bài giảng theo khuôn của khoá** (`split --style khoa`): mốc in đậm, mỗi lượt lời một dòng, đoạn cắt trong khung cảnh báo, có mục lục; lưu cạnh bản chép lời gốc, không ghi đè file có sẵn.
+- **Từ đệm chia rõ hơn, bạn đỡ phải soát.** Lặp từ ngay trong một cụm ("có có nắm được") vào nhóm đề xuất cắt; lặp qua dấu câu ("…là thiên. Thiên là…"), từ láy ("vân vân", "lâu lâu") và tiểu từ liệt kê ("tiền ư danh ư") vào nhóm mới **Giữ**, không đề xuất cắt. Đo trên 577 chỗ của 6 buổi giảng đã chấm tay: nhóm đề xuất cắt đúng khoảng 91%, nhóm Giữ đúng khoảng 96%, chỉ còn khoảng 1/4 số chỗ cần bạn nghe lại. Vẫn chỉ cắt mã bạn duyệt; `duyệt all` gồm nhóm A và B, không gồm nhóm Giữ.
+- Có link YouTube thì skill gợi ý tải phụ đề có mốc từng từ để đặt điểm cắt chính xác, kể cả khi bạn đã có bản `.txt`.
+- Đọc `KAIZEN.md` của dự án ở bước đầu và báo mã luật đã áp.
+
+**Sửa lỗi**
+
+- **Đo âm thanh cả file.** Trước đây skill đo một mẫu 30 giây (và thực ra chỉ đọc khung âm thanh cuối của mẫu), nên mẫu rơi vào chỗ ngừng nói thì khuyên nhầm "master". Giờ đo độ to tích hợp cả file và lệch hai tai trong một lượt; chỉ khuyên master khi cả file dưới khoảng −24 LUFS, cảnh báo khi sát ngưỡng, và đề xuất cùng chế độ với các clip đã có của khoá.
+- **Cắt video con an toàn hơn.** Kế hoạch dài hơn video bị từ chối trước khi cắt; mỗi clip được kiểm thời lượng, hình và tiếng rồi mới mang tên thật; báo đủ mọi tên trùng một lần.
+- Tải phụ đề và video bỏ qua file cấu hình yt-dlp nằm sẵn trong thư mục, để file lạ không chèn được lệnh vào lượt tải.
+
+### mk-video-cutter
+
+**Sửa lỗi**
+
+- **Đo âm thanh cả file.** `probe` đo độ to tích hợp và từng tai trên cả file, không còn khuyên nhầm "master" khi mẫu 30 giây rơi vào chỗ im lặng; mẫu thời điểm chỉ còn để tham khảo, cảnh báo khi sát ngưỡng −24 LUFS. `cut --mode auto` dùng cùng số đo.
+
+**Mới**
+
+- Đọc `KAIZEN.md` của dự án ở bước đầu và báo mã luật đã áp.
+
+### mk-star, mk-exec-review
+
+**Mới**
+
+- Đọc `KAIZEN.md` của dự án ở bước đầu và báo mã luật đã áp.
+
 ## v0.8.0 — 31/10/2026
 
 ### mk-subtitle

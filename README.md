@@ -1,198 +1,208 @@
 # mk-studio
 
-Bộ skill **content, review và đóng gói giá trị** cho AI coding agent (Claude Code, omp, Codex và các agent hỗ trợ chuẩn Agent Skills). Mỗi skill hoạt động độc lập, cài đặt riêng biệt theo nhu cầu.
+Bộ skill **nội dung, video và đóng gói giá trị** cho AI coding agent (Claude Code, omp, Codex và mọi agent đọc chuẩn Agent Skills). Mỗi skill đứng độc lập, cài riêng theo nhu cầu; dùng chung thì nối thành một dây chuyền từ bài giảng thô tới video con có phụ đề và thumbnail.
 
 Bộ skill kỹ thuật & lập trình đi kèm là **[mk-lab](https://github.com/mzavn/mk-lab)** (Spec-Driven Development).
 
 ---
 
-## Danh mục skill hiện có
+## Danh mục skill
 
-| Skill | Lệnh Claude Code | Gọi bằng lời tự nhiên | Mục đích chính |
+| Skill | Gọi | Nói tự nhiên | Làm gì |
 |---|---|---|---|
-| **`mk-star`** | `/mk:star` | *"viết nhật ký ngày"*, *"giải quyết vấn đề"*, *"luyện case 05"* | Hệ nhật ký STAR 5 loại: biến cảm xúc/vấn đề/thành công thành quyết định, kế hoạch và tài sản đóng gói. Lưu hoàn toàn ở máy cá nhân (`~/nhat-ky-star/`). |
-| **`mk-exec-review`** | `/mk:exec-review <file>` | *"phản biện bài <đường dẫn>"*, *"đọc bài như CEO"*, *"soát bài"* | Hội đồng C-level (CEO, CFO, CMO, COO, CTO) phản biện bài viết theo chân dung khách hàng thật, bóc giọng văn AI, chuẩn hóa thuật ngữ, tối ưu SEO/GEO/AEO, duyệt từng mã gợi ý trước khi sửa. |
-| **`mk-subtitle`** | `/mk:subtitle <file, video hoặc link YouTube>` | *"xử lý phụ đề <file>"*, *"lấy phụ đề youtube"*, *"làm phụ đề cho video"*, *"cắt ừ à"*, *"chia file con"*, *"cắt chỗ nói lại"*, *"in phụ đề vào video"* | Phụ đề cho khâu dựng video, chia buổi học dài thành file con và làm bản final cho video có kịch bản: tải phụ đề có sẵn từ link YouTube (có mốc từng từ) hoặc chép lời bằng Gemini qua `agy` (mốc đo trên âm thanh), duyệt từ đệm, chuẩn hoá tiếng Việt, dịch tiếng Anh, ngắt dòng theo khổ video ngang/dọc (nhập thẳng CapCut), lập Bảng lệnh Editor chia bài giảng 20–30p giữ trọn vấn đáp, bỏ câu đọc lại và ghép một file final, in phụ đề vào video (tuỳ chọn, tránh mặt người nói, đúng vùng an toàn từng nền tảng). |
-| **`mk-video-cutter`** | `/mk:video-cutter <video>` | *"cắt video"*, *"chia clip con"*, *"bỏ thanh zoom"*, *"video dọc 9:16"*, *"nâng 1080p"*, *"làm nét video"* | Cắt video bài giảng dài thành clip chuyên đề theo Action Sheet: tự cắt viền thừa của video quay màn hình (thanh menu, thanh Zoom, dải đen) có ảnh xem trước để duyệt, xuất khung 16:9 / 9:16 / tuỳ chỉnh ở chuẩn phù hợp nguồn (720p → 1080p), làm nét vừa phải, giữ trọn hình, hoặc giữ nguyên hình gốc; cân bằng âm thanh hai tai, chuẩn âm lượng -16 LUFS, nghiệm thu bằng `ffprobe`. |
+| **`mk-star`** | `/mk:star` | *"viết nhật ký ngày"*, *"giải quyết vấn đề"*, *"luyện case 05"* | Hệ nhật ký STAR 5 loại: biến cảm xúc, vấn đề, thành công thành quyết định, kế hoạch và tài sản đóng gói. Lưu hoàn toàn trên máy (`~/nhat-ky-star/`). |
+| **`mk-exec-review`** | `/mk:exec-review <file>` | *"phản biện bài <đường dẫn>"*, *"đọc bài như CEO"*, *"soát bài"* | Hội đồng C-level phản biện bài viết theo chân dung khách hàng, bóc giọng văn AI, chuẩn hoá thuật ngữ, tối ưu SEO/GEO/AEO; chỉ sửa mã bạn duyệt. |
+| **`mk-subtitle`** | `/mk:subtitle <file, video hoặc link YouTube>` | *"lấy phụ đề youtube"*, *"cắt ừ à"*, *"chia file con"*, *"cắt chỗ nói lại"*, *"in phụ đề vào video"* | Phụ đề cho khâu dựng: tải phụ đề/video YouTube, duyệt từ đệm, chuẩn hoá tiếng Việt, dịch tiếng Anh, chia buổi học 2–4 tiếng thành file con 20–30 phút có Bảng lệnh Editor, cắt video con, bản final cho video có kịch bản, in phụ đề vào video. |
+| **`mk-video-cutter`** | `/mk:video-cutter <video>` | *"cắt video"*, *"bỏ thanh zoom"*, *"video dọc 9:16"*, *"nâng 1080p"* | Cắt clip theo Action Sheet với khung hình sạch (bỏ thanh Zoom, dải đen), đổi khung 16:9 / 9:16, lên 1080p, làm nét vừa phải, cân bằng hai tai và chuẩn âm lượng. |
+| **`mk-thumbnail`** | `/mk:thumbnail <thư mục video>` | *"làm thumbnail"*, *"ảnh bìa video"*, *"thumbnail cả thư mục"* | Thumbnail YouTube cho cả chuỗi bài giảng theo một khuôn: nhãn `Buổi N · Pxx` và tiêu đề lấy từ tên file, ghép nền AI bạn tự tạo (skill viết prompt) hoặc nền bát quái vẽ sẵn, chân dung, logo. Chạy offline. |
+| **`mk-kaizen`** | `/mk:kaizen` | *"ghi lại luật này"*, *"lần sau nhớ"*, *"dự án này có luật gì"* | Luật riêng của dự án trong `KAIZEN.md`: điều bạn đã sửa, yêu cầu lâu dài, quyết định đã chốt. Mọi skill mk đọc và theo; luật lặp ở nhiều dự án thành đề xuất sửa skill. |
 
-> **Lưu ý tên lệnh và quyền:**
-> - Gọi nhanh qua slash command: `/mk:star`, `/mk:exec-review`, `/mk:subtitle`, `/mk:video-cutter`. Thư mục cài đặt và cờ `--skill` dùng tên gạch nối: `mk-star`, `mk-exec-review`, `mk-subtitle`, `mk-video-cutter`.
-> - Tiền tố `mk:` là quy ước định danh riêng của bộ skill này, **không** phải plugin Claude Code tên `mk`. Nếu bạn cấu hình quyền trong `settings.json`, hãy khai báo theo tên skill, vd `Skill(mk:star)`.
+> **Tên lệnh và quyền**
+> - Slash command dùng dấu hai chấm (`/mk:subtitle`); thư mục cài và cờ `--skill` dùng gạch nối (`mk-subtitle`).
+> - Tiền tố `mk:` là quy ước đặt tên của bộ skill, **không** phải plugin Claude Code tên `mk`. Cấu hình quyền trong `settings.json` thì khai báo theo tên skill, vd `Skill(mk:star)`.
+
+---
+
+## Dây chuyền video bài giảng
+
+```mermaid
+flowchart LR
+  YT["Link YouTube"] -->|"mk:subtitle fetch-video / fetch"| SRC["Video gốc + phụ đề"]
+  SRC -->|"mk:subtitle chia-buổi"| MD["Buổi N.md<br/>Bảng lệnh Editor"]
+  MD -->|"mk:subtitle cut-video"| FINAL["VIDEO/FINAL/<br/>Buổi N_P01 - ….mp4"]
+  MD -->|"mk:video-cutter"| CLIP["Clip khung sạch<br/>16:9 · 9:16 · 1080p"]
+  FINAL -->|"mk:thumbnail"| THUMB["Thumbnail 1280×720"]
+  CLIP -->|"mk:thumbnail"| THUMB
+  K["KAIZEN.md của dự án"] -.->|"luật riêng, ghi đè mặc định"| MD
+  K -.-> FINAL
+  K -.-> CLIP
+  K -.-> THUMB
+```
+
+Mỗi mũi tên là một bước bạn duyệt trước khi skill ghi file; không skill nào ghi đè hay xoá file gốc.
+
 ---
 
 ## 1. mk:star — Hệ nhật ký STAR (5 loại)
 
-`mk:star` đồng hành dẫn dắt bạn viết nhật ký từng câu hỏi theo đúng khuôn mẫu chuẩn, lưu thành từng file Markdown độc lập tại thư mục riêng (`~/nhat-ky-star/`) và theo dõi tiến độ qua các cột mốc thực hành.
+Dẫn bạn viết nhật ký từng câu hỏi theo khuôn chuẩn, lưu mỗi bài thành một file Markdown trong `~/nhat-ky-star/` và theo dõi tiến độ theo cột mốc.
 
-### 5 loại nhật ký
-
-| Loại | Thời điểm viết | Trọng tâm đầu ra |
+| Loại | Khi viết | Đầu ra |
 |---|---|---|
-| **I · Daily Diary** | Trong ngày hoặc cuối ngày | Cải tiến 1% mỗi ngày, cam kết hành động ngày mai (*One Action* có giờ cụ thể). |
-| **II · Problem Solving** | Gặp khó khăn, vướng mắc, thất bại | Bản đầy đủ 8 bước A–Z (Situation → Think & Feel → SEE → UNDERSTAND → DECIDED → ACTION → EVOLVE) hoặc bản "viết nhanh" 4 bước (R → S → T → A). |
-| **III · Packing Value** | Sau một thành công hoặc kết quả tốt | Đóng gói kinh nghiệm thành 1 trong 8 dạng tài sản chuyển giao được. |
-| **IV · Creating Future** | Trước sự kiện, dự án hoặc cuộc gặp quan trọng | Kiến tạo kịch bản, chuẩn bị tâm thế và phương án ứng phó trước khi hành động. |
-| **V · Mentoring** | Trước buổi 1-1, đào tạo, coaching, bán hàng | Thấu cảm người đối diện (R → S → T → A) rồi soi chiếu lại năng lực người dẫn dắt. |
+| **I · Daily Diary** | Trong ngày hoặc cuối ngày | Cải tiến 1% mỗi ngày, một hành động cho ngày mai có giờ cụ thể. |
+| **II · Problem Solving** | Gặp khó khăn, vướng mắc, thất bại | Bản đầy đủ 8 bước A–Z hoặc bản viết nhanh 4 bước (R → S → T → A). |
+| **III · Packing Value** | Sau một thành công | Đóng gói kinh nghiệm thành 1 trong 8 dạng tài sản chuyển giao được. |
+| **IV · Creating Future** | Trước sự kiện, dự án, cuộc gặp quan trọng | Kịch bản, tâm thế và phương án ứng phó trước khi hành động. |
+| **V · Mentoring** | Trước buổi 1-1, đào tạo, coaching, bán hàng | Thấu cảm người đối diện rồi soi lại năng lực người dẫn dắt. |
 
-### Tính năng đi kèm
-- **Kho bài tập & Case thực hành:** 4 case giải mẫu chi tiết từng bước và 28 case tình huống quản trị/đời sống để luyện tập phản xạ giải quyết vấn đề.
-- **Theo dõi tiến độ (`progress.py`):** Tự động đếm số bài trọn vẹn theo 4 cột mốc (28 / 300 / 1.000 / 10.000 bài), cảnh báo việc hẹn chưa làm và kết quả đến hạn nghiệm thu.
-- **An toàn dữ liệu cá nhân:** Nhật ký lưu hoàn toàn cục bộ trên máy bạn; script cảnh báo nếu thư mục nằm trong git; ghi file nguyên tử (`os.replace`) chống mất dữ liệu khi gián đoạn; từ chối can thiệp qua symlink.
+- **Kho luyện tập:** 4 case giải mẫu từng bước và 28 case tình huống quản trị, đời sống.
+- **Tiến độ (`progress.py`):** đếm bài trọn vẹn theo 4 cột mốc (28 / 300 / 1.000 / 10.000), nhắc việc hẹn chưa làm và kết quả đến hạn nghiệm thu.
+- **Dữ liệu cá nhân:** chỉ lưu trên máy; cảnh báo khi thư mục nằm trong git; ghi file nguyên tử; từ chối ghi xuyên symlink.
 
 ---
 
 ## 2. mk:exec-review — Hội đồng C-level phản biện bài viết
 
-`mk:exec-review` đóng vai trò một ban cố vấn lãnh đạo độc lập đọc bài viết tiếng Việt (Markdown) bằng lăng kính của chân dung khách hàng mục tiêu (*Customer Persona*), rà soát toàn diện trước khi xuất bản.
+Một ban cố vấn độc lập đọc bài viết tiếng Việt (Markdown) qua chân dung khách hàng mục tiêu trước khi đăng.
 
-### 5 góc nhìn phản biện
+1. **Hội đồng theo persona:** 2–4 vai trong CEO, CFO, CMO, COO, CTO; chỉ ra dòng giữ chân người đọc, dòng làm mất niềm tin, câu hỏi còn bỏ ngỏ.
+2. **Giọng văn AI:** mở bài sáo, đối lập lật ngược lặp lại, từ phô trương, câu dịch thô, lạm dụng gạch dài; giữ nguyên câu có chất giọng người thật.
+3. **Thuật ngữ:** đồng nghĩa trôi dạt, vị trí dấu (hoá/hóa), viết hoa giữa câu; không gộp khái niệm tác giả cố ý tách.
+4. **SEO / AEO / GEO:** khớp ý định tìm kiếm, câu trả lời 40–60 tiếng dưới tiêu đề dạng hỏi, thực thể rõ và trích dẫn được cho ChatGPT, Perplexity, AI Overviews.
+5. **Ý tưởng (mã Y):** 3–5 hướng nâng bài, xếp theo mức tác động.
 
-1. **Hội đồng C-level theo Persona:** Chọn 2–4 vai lãnh đạo phù hợp (CEO: chiến lược & hành động; CFO: chi phí & ROI; CMO: khách hàng & thông điệp; COO: quy trình vận hành; CTO: khả thi công nghệ). Chỉ ra chính xác dòng giữ chân, dòng gây mất niềm tin và câu hỏi còn mắc lại.
-2. **Soi dấu hiệu giọng văn AI:** Nhận diện các cấu trúc sáo mòn tiếng Việt (mở bài sáo, đối lập lật ngược lặp lại, từ ngữ phô trương, dịch thô từ tiếng Anh, lạm dụng gạch nối `—`), bảo vệ các câu mang chất giọng người thật và ví dụ thực chiến.
-3. **Chuẩn hóa thuật ngữ:** Phát hiện đồng nghĩa trôi dạt, sai lệch vị trí dấu thanh (hoá/hóa), gạch nối/viết hoa giữa câu (Fanpage/fanpage); đề xuất dạng chuẩn dựa trên bảng thuật ngữ hoặc định nghĩa gốc của tác giả; tuyệt đối không gộp các khái niệm cố ý tách biệt hoặc từ ngữ ẩn dụ.
-4. **Tối ưu SEO / GEO / AEO:** 
-   - *SEO:* Khớp ý định tìm kiếm thực tế của persona, tối ưu tiêu đề và thẻ mô tả.
-   - *AEO (Answer Engine):* Câu trả lời định nghĩa súc tích 40–60 tiếng ngay dưới tiêu đề dạng hỏi, cấu trúc độc lập.
-   - *GEO (Generative Engine - ChatGPT/Perplexity/AI Overviews):* Trích dẫn được, thực thể định danh rõ ràng, E-E-A-T minh bạch từ trải nghiệm thực tế.
-5. **Ý tưởng cải thiện (Mã Y):** Đề xuất 3–5 hướng nâng cấp bài viết (ví dụ gần gũi hơn, con số tự nhẩm trong 1 phút, câu hỏi mang vào cuộc họp) có xếp hạng mức độ tác động.
-
-### Bất biến & Quy trình duyệt sửa
-- **Tác giả làm chủ:** Phản biện được tách riêng sang một subagent độc lập (chỉ đọc). Báo cáo trả về bảng gợi ý đánh mã (`A` giọng AI, `T` thuật ngữ, `S` SEO/GEO, `C` hội đồng, `Y` ý tưởng).
-- **Kiểm cơ học bằng script (`check_report.py`):** Kiểm tra tính duy nhất của đoạn trích, vị trí dòng, loại sửa, không sinh số liệu mới, không đổi đích link/ảnh/HTML ngầm.
-- **Duyệt trước khi sửa:** Tác giả duyệt mã nào (`duyệt A1 T1-T3`, `S1:2`), agent chỉ sửa đúng mã đó. Tuyệt đối giữ nguyên tone giọng, cấu trúc lập luận và ví dụ gốc của tác giả. Chỗ thiếu số liệu sẽ để ô `[điền: …]`, không bao giờ bịa đặt.
+Phản biện chạy trong một subagent chỉ đọc, trả về bảng mã (`A` giọng AI, `T` thuật ngữ, `S` SEO/GEO, `C` hội đồng, `Y` ý tưởng). `check_report.py` kiểm cơ học báo cáo (trích dẫn có thật, không thêm số liệu, không đổi link/ảnh/HTML). Bạn duyệt mã nào (`duyệt A1 T1-T3`) agent sửa đúng mã đó; chỗ thiếu số liệu để ô `[điền: …]`, không bịa.
 
 ---
 
-## 3. mk:subtitle — Phụ đề & chia file con cho khâu dựng video
+## 3. mk:subtitle — Phụ đề, chia buổi học và cắt video con
 
-Gõ `/mk:subtitle <file .srt, .vtt, .txt, video>` hoặc đưa **link YouTube**. Skill có ba mode nghiệp vụ.
+Gõ `/mk:subtitle` kèm file `.srt`, `.vtt`, `.txt`, video, hoặc link YouTube.
 
-**Chưa có phụ đề?** Video đã đăng YouTube (kể cả không công khai) → skill tải phụ đề có sẵn trong vài giây (cần `yt-dlp`), ưu tiên bản chủ kênh tải lên, không có thì bản tự động gốc có mốc từng từ; bản dịch máy bị từ chối. Chỉ có file video (khoảng ≤ 15 phút) → nếu bạn đồng ý gửi âm thanh lên Google, skill chia video thành từng cụm lời theo khoảng ngừng, nhờ Gemini qua Antigravity CLI (`agy`) chép lời từng cụm, còn mốc thời gian đo trên chính âm thanh (mốc Gemini tự đưa hay lệch nên không dùng). Không đồng ý → đăng YouTube không công khai rồi tải phụ đề, hoặc tự cài whisper.cpp (miễn phí, chạy trên máy).
+**Lấy nguồn**
+- **Phụ đề có sẵn trên YouTube** (`fetch`): vài giây, ưu tiên bản chủ kênh, không có thì bản tự động gốc có mốc từng từ; bản dịch máy bị từ chối.
+- **Video nguồn theo chuẩn khoá** (`fetch-video`): mặc định 720p30 H.264 + AAC, không ghi đè, so với video buổi trước (`--ref`) và báo `LỆCH:` khi khác độ phân giải, khung hình, codec. Chỉ tải khi bạn yêu cầu, từ đúng link bạn đưa.
+- **Chỉ có file video ≤ 15 phút:** khi bạn đồng ý gửi âm thanh lên Google, Gemini qua `agy` chép lời từng cụm, mốc thời gian đo trên chính âm thanh. Không đồng ý: đăng YouTube không công khai rồi `fetch`, hoặc tự cài whisper.cpp.
 
-### Mode phụ đề (SRT / VTT)
+**Mode phụ đề (SRT/VTT)**
+1. Từ đệm "à, ừ, ờ…" và lặp từ chia ba nhóm: **A** đề xuất cắt (âm đệm giữa câu, lặp vấp trong cụm), **B** cần nghe lại (đầu câu, sau câu hỏi, sau tên riêng hay từ xưng hô), **Giữ** (lặp qua dấu câu, từ láy, tiểu từ liệt kê). Đo trên 577 chỗ đã chấm tay: A đúng khoảng 91%, Giữ khoảng 96%, chỉ khoảng 1/4 số chỗ cần bạn nghe lại. Chỉ mã bạn duyệt mới bị xoá và vào danh sách cắt cho editor.
+2. Ngắt dòng theo khổ video (ngang 42 ký tự, dọc 26), cảnh báo câu đọc không kịp.
+3. Chuẩn hoá tiếng Việt theo bảng thuật ngữ của dự án; dịch tiếng Anh khớp từng câu, cùng mốc.
+4. Thư mục giao editor: phụ đề Việt/Anh timeline gốc và sau cắt, track `✂` tham chiếu, `cat.csv`, `BAN-GIAO.md`.
 
-1. **Từ đệm "à, ừ, ờ, ừm…" và lặp từ:** đánh dấu thành hai nhóm — A (âm đệm giữa câu, đề xuất xoá) và B (cần nghe lại: câu đáp "Ừ, đúng rồi", tiểu từ hỏi "Thế à?", lặp từ). Bạn duyệt mã nào thì mới xoá khỏi phụ đề và đưa vào danh sách đoạn cắt cho editor.
-2. **Chia câu, ngắt dòng:** tối đa 2 dòng × 42 ký tự, cảnh báo cue đọc không kịp.
-3. **Chuẩn hoá tiếng Việt:** sửa lỗi nhận giọng theo bảng thuật ngữ của repo, chính tả, dấu câu; giữ đúng lời người nói, chỗ chưa chắc đưa vào danh sách xác nhận.
-4. **Dịch tiếng Anh:** mỗi cue dịch đúng một cue, cùng mốc thời gian.
-5. **Đầu ra:** thư mục giao file gồm phụ đề Việt/Anh timeline gốc, phụ đề sau cắt, track `✂` tham chiếu timeline, `cat.csv` và `BAN-GIAO.md`.
+**Mode chia buổi (bài giảng 2–4 tiếng)**
+1. Lọc thời gian chết: chào hỏi, thử mic đầu giờ, giải lao có quãng lặng, mất tiếng. Nghỉ tại chỗ không có quãng lặng thì không tạo đoạn CUT, chỉ ghi chú editor tỉa câu báo nghỉ.
+2. Chia file con 20–30 phút theo chủ đề; vấn đáp giữ đủ `[A Hỏi]` – `[B Đáp]`, đối thoại Socrates giữ đủ ba nhịp.
+3. **Bảng lệnh Editor** (🛑 CUT / 🟢 KEEP, timecode, tiêu đề, ghi chú đồ hoạ) và file bài giảng theo khuôn khoá (`split --style khoa`: mốc in đậm, mỗi lượt lời một dòng `> 🗣️`, đoạn CUT là `[!WARNING]`, mục lục `[!ABSTRACT]`).
+4. **Một nguồn tên cho mọi đầu ra:** `--name "{prefix}_P{n:02} - {title}"` (hoặc tự suy từ file có sẵn trong `VIDEO/FINAL/`) đặt tên đồng bộ cho bảng Editor, phụ đề và video; `--label` đặt nhãn hiển thị.
+5. **Âm thanh:** `probe-audio` đo độ to tích hợp **cả file** (`ebur128`) và lệch hai tai; chỉ khuyên `master` khi cả file dưới khoảng −24 LUFS, cảnh báo khi sát ngưỡng, và đề xuất cùng chế độ với các clip đã có của khoá.
+6. **Cắt video con** (`cut-video`): từ chối kế hoạch dài hơn video trước khi cắt; mỗi clip được `ffprobe` kiểm thời lượng, hình và tiếng rồi mới mang tên thật; không ghi đè file có sẵn.
 
-### Mode chia buổi học dài thành file con (Quy trình Kaizen)
+**Mode video có kịch bản (bản final):** tách cụm lời theo khoảng ngừng (lệch trung vị khoảng 0,03 giây), tìm câu đọc lại, bạn duyệt bảng CUT/KEEP, ghép một file final kèm phụ đề đã dời mốc.
 
-Áp dụng cho bài giảng dài 2–4 tiếng (bản chép lời có mốc `[mm:ss]` TXT/MD, SRT hoặc VTT):
+**In phụ đề vào video (tuỳ chọn):** đặt chữ trong vùng an toàn của TikTok / Shorts / Reels / YouTube, tránh mặt người nói, cho xem ảnh mẫu trước khi in. Cần ffmpeg có libass.
 
-1. **Phản biện 3 trục (Fable-Thinking):** lọc sạch 100% thời gian chết (mic check đầu giờ, giải lao giữa bài, mất tiếng, thủ tục bế mạc) nhưng bảo toàn trọn vẹn tri thức cốt lõi.
-2. **Topic-First 20–30 phút:** chia bài giảng thành các file con chuẩn vàng kèm mã định danh đồng bộ (`Buổi 1:P1`, `Buổi 1:P2`…; ca vấn đáp độc lập đặt mã `P5.1`, `P5.2`…).
-3. **Bảo toàn ngữ cảnh:** bắt buộc đủ cấu trúc hai vế `[A Hỏi]` (bối cảnh) và `[B Đáp]` (khai tuệ); giữ trọn vẹn nhịp 3 bước của đối thoại Socrates `[B Hỏi]` → `[A Đáp]` → `[B Khai Tuệ]`.
-4. **Đầu ra hoàn chỉnh cho Editor:** xuất **Bảng lệnh Editor (Action Sheet)** với timecode chính xác và lệnh 🛑 CUT / 🟢 KEEP; sinh khung bài giảng Markdown; xuất phụ đề `.srt` riêng từng file con (bắt đầu từ 00:00:00); kiểm tra lỗi bằng lệnh lint và xuất dòng tổng kết Kaizen sau mỗi buổi.
-5. **Cắt video con & Cân bằng âm thanh (Lossless FFmpeg):** khảo sát âm lượng/lệch kênh hai tai bằng lệnh `probe-audio`, tự động cắt hàng loạt video con theo Action Sheet với tốc độ siêu tốc (`-c:v copy` giữ nguyên 100% chất lượng hình ảnh gốc, chỉ re-encode audio sang AAC 192k khi cần cân bằng âm thanh và đưa về chuẩn -16 LUFS).
-
-### Mode video có kịch bản (bản final)
-
-Video quay một lần, người nói đọc lại hoặc vấp vài chỗ (thường dưới 15 phút):
-
-1. **Cụm lời đúng mốc:** tách cụm theo khoảng ngừng ở dải tần giọng nói — đo trên video thật, ranh giới lệch trung vị khoảng 0,03 giây; báo phần đầu/cuối không có lời.
-2. **Lời từng cụm:** từ phụ đề có sẵn, hoặc Gemini qua `agy` (đoạn chỉ có nhạc ghi `NONE`).
-3. **Tìm câu đọc lại:** câu nói lại y nguyên, câu gần giống, cụm lặp cuối–đầu — cần có khoảng ngừng trước lần đọc lại, nên câu lặp có chủ ý (điệp ngữ) không bị cắt. Ra bảng 🛑 CUT / 🟢 KEEP để bạn duyệt.
-4. **Bản final:** cắt mốc lẻ giây, ghép một file (x264 CRF 18, giữ khung gốc, làm mờ tiếng 20 ms ở điểm nối), kèm phụ đề Việt/Anh đã dời mốc; script tự so thời lượng. Đổi khung, lên 1080p thì chạy tiếp `mk:video-cutter`.
-
-### Phụ đề đẹp và in phụ đề vào video
-
-- **Mọi file `.srt`** skill tạo ra đã ngắt dòng theo khổ video (ngang 42 ký tự/dòng, dọc 26), xuống dòng ở chỗ tự nhiên, nhịp đọc theo chuẩn Netflix tiếng Việt. Nhập thẳng vào CapCut Desktop/Web để hậu kỳ (CapCut điện thoại không nhập được file phụ đề). Đã có `.srt` khổ khác: *"ngắt lại phụ đề này cho video dọc"*.
-- **In phụ đề vào video (tuỳ chọn):** nói *"in phụ đề vào video, đăng TikTok"*. Skill lấy vài khung mẫu, đo vị trí mặt người nói (macOS), tính vùng đặt chữ tránh nút bấm của TikTok / Shorts / Reels / YouTube và không che mặt, cho bạn xem ảnh vùng chữ và ảnh có chữ thật rồi mới in ra `<tên>-sub.mp4`. Font mặc định Arial (đủ dấu tiếng Việt), đổi được font, cỡ chữ, viền/nền mờ, kiểu một dòng chữ to.
-- Cần `ffmpeg` có libass: macOS `brew install ffmpeg-full` (cài song song, không thay ffmpeg đang dùng); Windows `winget install Gyan.FFmpeg`. Cần đổi khung bằng `mk:video-cutter` thì đổi trước, in phụ đề sau cùng.
 ---
 
-## 4. mk:video-cutter — Cắt video bài giảng: khung hình sạch, âm thanh đều
+## 4. mk:video-cutter — Khung hình sạch, âm thanh đều
 
-Gõ `/mk:video-cutter <file_video.mp4> --sheet <file_action_sheet>`. Skill phân rã video bài giảng dài (2–4 tiếng) thành các clip chuyên đề (10–30 phút) theo Action Sheet:
+Gõ `/mk:video-cutter <video> --sheet <action sheet>`. Phân rã bài giảng dài thành clip chuyên đề:
 
-1. **Khảo sát âm thanh:** đo độ lớn hai tai, phát hiện điếc một bên hoặc âm lượng quá nhỏ, chọn chế độ `copy` (giữ nguyên), `balance` (dual-mono) hoặc `master` (dual-mono + chuẩn -16 LUFS).
-2. **Khung hình sạch (mới):** video quay cả cửa sổ Zoom thường dính thanh menu, thanh công cụ và dải đen. Skill tìm vùng bài giảng (phần chuyển động) và xuất 2 ảnh xem trước: khung đỏ = phần giữ, và một khung hình thành phẩm. Bạn duyệt rồi mới cắt. Nếu Zoom đổi bố cục giữa buổi, skill báo đoạn bị ảnh hưởng để cắt riêng.
-3. **Khung đầu ra:** 16:9, 9:16, 1:1, 4:5 hoặc kích thước tuỳ chỉnh. `--res auto` lên đúng một bậc chuẩn so với nguồn (720p → 1080p, phóng tối đa 1,8×); ép 2K/4K từ nguồn 720p sẽ bị cảnh báo vì chỉ làm file to, không nét hơn. Mặc định giữ trọn hình và bù nền đen; video dọc có thể dùng nền mờ.
-4. **Làm nét vừa phải (`--enhance`):** khử khối vỡ do nén, khử nhiễu, làm nét nhẹ; chữ trên bảng gọn hơn mà không bị vẽ lại. Muốn nét hơn nữa thì tài liệu skill giới thiệu công cụ AI cài thêm (Real-ESRGAN, Topaz Video…) kèm rủi ro; skill không có sẵn các công cụ này.
-5. **Chất lượng:** không đổi khung thì hình giữ nguyên từng điểm ảnh, cắt cả bài trong vài giây. Đổi khung thì máy nén lại ở mức cao (đo trên bài giảng thật: VMAF 97/100), mất khoảng 1/5 thời lượng clip trên Mac Apple Silicon (có làm nét: khoảng 1/3).
-6. **Nghiệm thu:** `ffprobe` kiểm dung lượng, thời lượng, khung hình từng clip (`--expect-size 1920x1080`).
+1. **Âm thanh:** `probe` đo cả file một lượt (độ to tích hợp + từng tai), chọn `copy` (giữ nguyên), `balance` (dual-mono khi lệch ≥ 4 dB hoặc điếc một tai) hoặc `master` (chuẩn −16 LUFS khi cả file quá nhỏ); khuyên giữ một chế độ cho cả khoá.
+2. **Khung hình sạch:** tìm vùng bài giảng trong cửa sổ Zoom, bỏ thanh menu, thanh công cụ, dải đen; ảnh xem trước để duyệt; báo đoạn Zoom đổi bố cục.
+3. **Khung đầu ra:** 16:9, 9:16, 1:1, 4:5 hoặc tuỳ chỉnh; `--res auto` lên đúng một bậc (720p → 1080p); cảnh báo khi ép 2K/4K từ nguồn 720p.
+4. **Làm nét vừa phải (`--enhance`):** khử khối vỡ, khử nhiễu, làm nét nhẹ, không vẽ lại chữ trên bảng.
+5. **Chất lượng:** không đổi khung thì giữ nguyên từng điểm ảnh; đổi khung thì nén lại ở mức cao (đo trên bài giảng thật: VMAF 97/100).
+6. **Nghiệm thu:** `ffprobe` kiểm dung lượng, thời lượng, khung hình từng clip.
+
+---
+
+## 5. mk:thumbnail — Thumbnail YouTube theo khuôn cho cả chuỗi
+
+Gõ `/mk:thumbnail <thư mục video>`. Skill chỉ đọc **tên file** (không mở video) và ghép ảnh theo một khuôn để cả chuỗi đồng bộ.
+
+```
+names → (prompt → bạn tạo ảnh nền vào nen/) → plan → sửa thumbnail.tsv → check → render [--doc]
+```
+
+- **Nhãn và tiêu đề:** `Buổi 2_P03 - Tứ Tượng….mp4` → nhãn `Buổi 2 · P03`, tiêu đề `Tứ Tượng…`; đổi khuôn nhãn bằng `--badge "Buổi {n} · Phần {p}"`. Sửa tiêu đề trong `thumbnail.tsv`: `|` để xuống dòng, `*chữ*` để tô vàng.
+- **Nền:** ảnh trong `nen/` (xoay vòng theo thứ tự). Muốn nền AI: `prompt` viết file prompt cho cả chuỗi (16:9, và 9:16 khi cần), không chữ, chừa vùng tối cho tiêu đề; bạn tạo ảnh bằng công cụ bất kỳ (Gemini, ChatGPT…) rồi bỏ vào `nen/`. Skill không gọi API ảnh nào, không lưu khoá. Không có ảnh: nền bát quái vẽ sẵn.
+- **Chân dung:** PNG đã tách nền ghép nguyên dáng; ảnh thường cắt vào khung tròn viền vàng. Tách nền bằng công cụ có sẵn của máy: Windows 11 Paint (*Remove background*), macOS Preview / Photos (*Copy Subject*).
+- **Bố cục:** tiêu đề trắng đậm tối đa 3 dòng, tự thu cỡ cho vừa, nằm phía đối diện chân dung trên lớp tối; nhãn góc trên trái, logo góc trên phải, góc dưới phải để trống cho thời lượng của YouTube.
+- **Đầu ra:** JPG 1280×720 dưới 2 MB, tuỳ chọn bản dọc 1080×1920; tên file bỏ ký tự Windows không nhận. Thêm ảnh sau thì `plan --update` giữ nguyên tiêu đề, nhãn bạn đã sửa.
+
+---
+
+## 6. mk:kaizen — Luật riêng của dự án
+
+Khi dựng, bạn thường phát sinh yêu cầu mới hoặc sửa cách agent làm ("tên file phải là `Buổi N_P0Y`", "luôn đo âm thanh cả file"). `mk:kaizen` giữ những điều đó trong `KAIZEN.md` của dự án để lần sau mọi skill tự theo.
+
+```markdown
+## K-001 · * · yêu-cầu · đang áp dụng
+- Luật: Tên file video con theo dạng `Buổi N_P0Y - <Tiêu đề>.mp4`, đặt trong `VIDEO/FINAL/`.
+- Nguồn: Buổi 6 — cut-video đặt tên khác quy ước khoá
+- Ngày: 2026-11-04
+```
+
+- **Ghi:** cuối bước, agent đề xuất mục mới dạng mã `K-mới-1…` với đúng câu sẽ ghi; chỉ mục bạn gọi tên mã mới được ghi. "ok", "cứ làm" không tính là duyệt.
+- **Đọc:** ở Bước 0, mỗi skill tìm `KAIZEN.md` từ thư mục đầu vào và thư mục đầu ra đi lên tới gốc git (không có git thì dừng dưới thư mục nhà) và báo các mã đã áp. File gần hơn thắng.
+- **Phạm vi:** luật chỉ ghi đè **mặc định** của skill (tên file, nhãn, ngưỡng, chế độ, bố cục…); không ghi đè chính sách an toàn, chương trình được chạy, đường dẫn ngoài thư mục làm việc, bước duyệt.
+- **Lệnh:** `list` (luật đang áp cho một skill), `check` (định dạng, mã trùng, luật trùng), `add` (chỉ thêm, không viết lại mục cũ), `set-status` (bỏ, hoặc đánh dấu `đã vào skill vX.Y.Z`), `promote` (luật xuất hiện ở ≥ 2 dự án hoặc lỗi ≥ 3 lần → ứng viên đưa vào chính skill qua `mk:skill-creator`).
 
 ---
 
 ## Yêu cầu môi trường
 
-- Hệ điều hành: macOS hoặc Linux (hỗ trợ `bash` 3.2 trở lên). Windows: chạy `install.sh` trong Git Bash (đi kèm [Git for Windows](https://git-scm.com/downloads/win)); hiện `mk-subtitle` và `mk-video-cutter` đã xử lý bảng mã cho Windows (in tiếng Việt qua pipe).
-- Python: `python3` ≥ 3.8 (chỉ sử dụng thư viện chuẩn, không cần cài thư viện ngoài).
-- Công cụ: `git`, [GitHub CLI](https://cli.github.com) đã đăng nhập (`gh auth status`), và `ffmpeg` / `ffprobe` (cho tính năng khảo sát âm thanh & cắt video).
-- Coding agent: Bất kỳ agent nào đọc thư mục skill chuẩn (`.claude/skills` hoặc `.agents/skills` như Claude Code, omp, Codex…).
+- **Hệ điều hành:** macOS, Linux; Windows chạy trong Git Bash (đi kèm [Git for Windows](https://git-scm.com/downloads/win)). `mk-subtitle` và `mk-video-cutter` đã xử lý bảng mã khi in tiếng Việt qua pipe trên Windows.
+- **Python:** `python3` ≥ 3.8, chỉ thư viện chuẩn.
+- **Cài đặt:** `git`, [GitHub CLI](https://cli.github.com) đã đăng nhập (`gh auth status`) vì repo là private.
+- **Video:** `ffmpeg` / `ffprobe` cho mk-subtitle, mk-video-cutter, mk-thumbnail. In chữ (thumbnail, in phụ đề) cần ffmpeg có **libass**: macOS `brew install ffmpeg-full` (cài song song, không thay ffmpeg đang dùng), Windows `winget install Gyan.FFmpeg`. Tải từ YouTube cần `yt-dlp`. Skill không tự cài công cụ nào.
+- **Agent:** bất kỳ agent nào đọc `.claude/skills` hoặc `.agents/skills` (Claude Code, omp, Codex…).
 
 ---
 
 ## Cài đặt
 
-Xem chi tiết từng bước cho người và agent tại [INSTALL.md](INSTALL.md).
-
-### 1. Cài đặt toàn hệ thống (Global)
-Mặc định cài đặt `mk-star` vào `~/.claude/skills/mk-star` và `~/.agents/skills/mk-star`:
+Chi tiết từng bước cho người và agent: [INSTALL.md](INSTALL.md).
 
 ```bash
+# Lấy repo và cài mk-star (mặc định) vào ~/.claude/skills và ~/.agents/skills
 gh repo clone mzavn/mk-studio ~/.mk-studio && bash ~/.mk-studio/install.sh --global
-```
 
-### 2. Cài đặt skill cụ thể
-Chỉ định tên thư mục skill qua cờ `--skill`:
-
-```bash
-# Cài đặt bộ phản biện exec-review cho toàn hệ thống
-bash ~/.mk-studio/install.sh --global --skill mk-exec-review
-
-# Cài đặt cả 3 skill
-bash ~/.mk-studio/install.sh --global --skill mk-star
-bash ~/.mk-studio/install.sh --global --skill mk-exec-review
+# Cài skill cụ thể
 bash ~/.mk-studio/install.sh --global --skill mk-subtitle
+
+# Cài cả bộ
+for s in mk-star mk-exec-review mk-subtitle mk-video-cutter mk-thumbnail mk-kaizen; do
+  bash ~/.mk-studio/install.sh --global --skill "$s"
+done
+
+# Cài vào một dự án (thêm --agents-dir cho Codex/omp)
+bash ~/.mk-studio/install.sh --project . --agents-dir --skill mk-thumbnail
 ```
 
-### 3. Cài đặt vào một dự án cụ thể (Project-level)
-Chép skill vào thư mục `.claude/skills/<tên-skill>` của dự án (thêm `--agents-dir` nếu dùng Codex/omp):
+Installer luôn chép file (không symlink), có manifest theo dõi, từ chối ghi đè bản bạn đã sửa tay trừ khi có `--force`.
+
+### Cập nhật và gỡ
 
 ```bash
-bash ~/.mk-studio/install.sh --project ~/code/my-content --skill mk-exec-review
-bash ~/.mk-studio/install.sh --project . --agents-dir --skill mk-exec-review
-```
-
-*Nguyên tắc cài đặt:* Luôn sao chép trực tiếp file, không dùng symlink; có manifest kiểm soát thay đổi; từ chối ghi đè nếu phát hiện sửa đổi thủ công trừ khi có `--force`.
-
----
-
-## Cập nhật & Gỡ cài đặt
-
-### Cập nhật
-Cập nhật kéo bản phát hành mới nhất từ nhánh `main` (chỉ cập nhật tới commit có gắn tag release `vX.Y.Z`):
-
-```bash
-# Cập nhật tất cả skill đã cài đặt toàn hệ thống
-bash ~/.mk-studio/install.sh --update
-
-# Cập nhật cả bản global và bản project hiện tại
-bash ~/.mk-studio/install.sh --update --global --project .
-```
-
-### Gỡ cài đặt
-Gỡ bỏ thư mục skill an toàn (không làm ảnh hưởng tới bài viết hay dữ liệu nhật ký tại `~/nhat-ky-star/`):
-
-```bash
+bash ~/.mk-studio/install.sh --update                          # mọi skill đã cài toàn máy
+bash ~/.mk-studio/install.sh --update --global --project .     # cả bản máy và bản dự án
 bash ~/.mk-studio/install.sh --uninstall --global --skill mk-exec-review
-bash ~/.mk-studio/install.sh --uninstall --project ~/code/my-content --skill mk-exec-review
 ```
+
+`--update` chỉ kéo bản phát hành có tag `vX.Y.Z` trên `main`. Gỡ skill không đụng tới nhật ký trong `~/nhat-ky-star/`, bài viết hay `KAIZEN.md` của dự án.
 
 ---
 
-## An toàn & Bảo mật
+## An toàn & bảo mật
 
-Bộ công cụ được thiết kế theo tiêu chuẩn an toàn cho Agentic SE:
-- **Bảo vệ đường dẫn & Symlink:** Bộ installer từ chối ghi hoặc xoá xuyên qua symlink (kể cả thư mục cha như `~/.claude` hay `~/.claude/skills`); ngăn chặn rò rỉ đường dẫn máy cá nhân vào dotfiles công khai.
-- **Toàn vẹn phát hành:** Lệnh `--update` bắt buộc kiểm tra chữ ký/tag phát hành ngữ nghĩa (`vX.Y.Z`), từ chối thực thi mã chưa qua phát hành chính thức từ nhánh `main`.
-- **Chống Prompt Injection & Rò rỉ dữ liệu:**
-  - Dữ liệu bài viết, chân dung khách hàng và quy ước dự án được đối xử là **dữ liệu thuần túy**, không phải câu lệnh chỉ thị.
-  - Subagent phản biện bị cô lập trong môi trường chỉ đọc (`read-only`), không quyền thực thi lệnh shell, không truy cập internet, không duyệt link trỏ ra ngoài repository.
-  - Mọi thao tác tạm thời của phiên làm việc diễn ra trong thư mục bảo mật riêng biệt (`mktemp -d`), được dọn dẹp sạch sau khi hoàn tất.
+- **File của bạn:** không skill nào sửa, ghi đè hay xoá file gốc; đầu ra là file mới, ghi qua file tạm rồi mới mang tên thật; từ chối ghi xuyên symlink.
+- **Dữ liệu là dữ liệu:** bài viết, phụ đề, tên file, chữ trong khung hình, `AGENTS.md` và `KAIZEN.md` không phải lệnh. Mục `KAIZEN.md` chỉ đặt giá trị mặc định đã liệt kê trong từng skill; mục đòi nới quyền bị báo lại, không làm theo.
+- **Mạng:** chỉ ra mạng khi bạn yêu cầu hoặc đồng ý: tải phụ đề và video YouTube (yt-dlp chạy với `--ignore-config`, không đọc cấu hình nằm sẵn trong thư mục) và chép lời qua Gemini (`agy`, hỏi riêng một câu). Thumbnail và các skill còn lại chạy offline.
+- **Chương trình được chạy:** `KAIZEN.md` và file trong dự án không được chỉ định chương trình nào để chạy; mk-thumbnail còn từ chối ffmpeg nằm trong thư mục đang làm việc và chỉ nhận đường dẫn ffmpeg tuyệt đối do bạn đưa.
+- **Subagent phản biện** (mk-exec-review) chỉ đọc, không chạy lệnh, không ra mạng. Việc tạm của phiên nằm trong `mktemp -d` và được dọn khi xong.
+- **Phát hành:** `--update` chỉ chạy mã đã gắn tag phát hành.
 
 ---
 
@@ -200,71 +210,66 @@ Bộ công cụ được thiết kế theo tiêu chuẩn an toàn cho Agentic SE
 
 ```
 mk-studio/
-├── install.sh                       # Bộ cài đặt idempotent chuẩn POSIX (bash 3.2+)
-├── INSTALL.md                       # Sổ tay hướng dẫn cài đặt cho người và agent
-├── CHANGELOG.md                     # Lịch sử thay đổi các phiên bản
-├── LICENSE                          # Giấy phép nguồn mở MIT
+├── install.sh            # Installer idempotent (bash 3.2+)
+├── INSTALL.md            # Hướng dẫn cài cho người và agent
+├── CHANGELOG.md
+├── LICENSE               # MIT
 ├── README.md
-├── tests/                           # Kiểm thử tự động cho installer
+├── tests/                # Test installer
 └── skills/
-    ├── mk-star/                     # Skill nhật ký STAR (/mk:star)
-    │   ├── SKILL.md                 # Điểm điều phối, bộ câu hỏi, quy tắc an toàn
-    │   ├── references/              # Hướng dẫn chi tiết 5 loại, kho case, bảng đối chiếu
-    │   ├── assets/mau/              # Khung mẫu bài viết chuẩn cho từng loại
-    │   └── scripts/                 # progress.py đo lường tiến độ và test suite
-    ├── mk-exec-review/              # Skill hội đồng phản biện CxO (/mk:exec-review)
-    │   ├── SKILL.md                 # Quy trình 5 bước: gom ngữ cảnh -> giao việc -> kiểm duyệt -> sửa
-    │   ├── references/              # Bộ tiêu chí hội đồng, bóc giọng AI, chuẩn thuật ngữ, SEO/GEO/AEO
-    │   ├── assets/                  # Mẫu giao việc cho subagent và mẫu báo cáo chuẩn
-    │   └── scripts/                 # scan.py quét số liệu, check_report.py kiểm cơ học và test suite
-    └── mk-subtitle/                 # Skill phụ đề cho khâu dựng video (/mk:subtitle)
-        ├── SKILL.md                 # Quy trình: quét -> duyệt từ đệm -> chuẩn hoá -> dịch -> giao editor
-        ├── references/              # Từ đệm, chuẩn hoá tiếng Việt, dịch tiếng Anh
-        ├── assets/                  # Mẫu BAN-GIAO.md cho editor
-        └── scripts/                 # subtitle.py (scan, fillers, clean, export, build, check, retime) và test suite
+    ├── mk-star/          # /mk:star — progress.py; references 5 loại nhật ký, kho case; assets/mau
+    ├── mk-exec-review/   # /mk:exec-review — scan.py, check_report.py; tiêu chí hội đồng, giọng AI, thuật ngữ, SEO/GEO/AEO
+    ├── mk-subtitle/      # /mk:subtitle — subtitle.py (fetch, fetch-video, fillers, clean, build, check, reflow…),
+    │                     #   lecture.py (scan, plan, split, lint, probe-audio, cut-video), takes.py, burn.py
+    ├── mk-video-cutter/  # /mk:video-cutter — cutter.py (probe, frame, parse, cut, verify)
+    ├── mk-thumbnail/     # /mk:thumbnail — thumbnail.py (names, prompt, plan, check, render)
+    └── mk-kaizen/        # /mk:kaizen — kaizen.py (find, list, check, add, set-status, promote)
+```
+
+Mỗi skill gồm `SKILL.md` (luồng điều phối), `references/` (chi tiết đọc khi cần), `scripts/` (thư viện chuẩn Python + test `unittest`).
+
+---
+
+## Phát triển
+
+Làm việc trên nhánh `dev`; `main` chỉ chứa bản phát hành. Commit theo Conventional Commits, scope là tên thư mục skill (`feat(mk-thumbnail): …`, `fix(mk-subtitle): …`, `fix(install): …`). Tạo hoặc sửa skill theo `/mk:skill-creator` của mk-lab.
+
+Kiểm tra trước khi phát hành (đủ lệnh trong `AGENTS.md`):
+
+```bash
+for s in skills/mk-*/; do
+  PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s "$s/scripts/tests" || break
+  python3 ../mk-lab/skills/mk-skill-creator/scripts/validate.py "$s" || break   # 0 lỗi
+done
+python3 -m unittest discover -s tests && python3 -m unittest discover -s tools/tests
+bash -n install.sh && /bin/bash -n install.sh
 ```
 
 ---
 
-## Đóng góp & Phát triển
-
-Dự án phát triển trên nhánh `dev` (`main` chỉ chứa các bản phát hành chính thức).
-
-1. Commit tuân thủ chuẩn Conventional Commits, scope là tên thư mục skill: `feat(mk-star): …`, `feat(mk-subtitle): …`, `fix(install): …`.
-2. Kiểm tra chất lượng (Definition of Done) trước khi phát hành:
-   ```bash
-   # Chạy toàn bộ test suites
-   python3 -m unittest discover -s skills/mk-star/scripts/tests && \
-   python3 -m unittest discover -s skills/mk-exec-review/scripts/tests && \
-   python3 -m unittest discover -s skills/mk-subtitle/scripts/tests && \
-   python3 -m unittest discover -s tests && \
-   python3 -m unittest discover -s tools/tests
-
-   # Kiểm tra cú pháp shell
-   bash -n install.sh && /bin/bash -n install.sh
-   ```
----
-
 ## Ghi công
 
-- Skill **`mk:star`** được tổng hợp và chuyển hóa từ phương pháp luận nhật ký của **X3 Năng Suất** ([minhvq.notion.site](https://minhvq.notion.site)) — *"Video tự học STAR bậc cao"* và *"Thực hành Giải quyết vấn đề từ A-Z"*, phát hành theo sự đồng ý của tác giả nội dung.
-- Skill **`mk:exec-review`** kế thừa tư duy biên tập thực chiến và mô hình kiểm duyệt đa tầng cho nhà sáng tạo nội dung.
-- Skill **`mk:subtitle`** đúc kết từ quy trình biên tập transcript họp và giao phụ đề cho team dựng video.
+- **`mk:star`** tổng hợp và chuyển hoá từ phương pháp luận nhật ký của **X3 Năng Suất** ([minhvq.notion.site](https://minhvq.notion.site)) — *"Video tự học STAR bậc cao"* và *"Thực hành Giải quyết vấn đề từ A-Z"*, phát hành theo sự đồng ý của tác giả nội dung.
+- **`mk:exec-review`** kế thừa tư duy biên tập thực chiến và mô hình kiểm duyệt nhiều tầng cho người làm nội dung.
+- **`mk:subtitle`**, **`mk:video-cutter`**, **`mk:thumbnail`**, **`mk:kaizen`** đúc kết từ quy trình dựng thực tế chuỗi bài giảng Kinh Dịch K5 (7 buổi, 40 video con): mỗi buổi là một vòng kaizen, bài học mới được đưa ngược vào skill.
 
 ---
 
 ## Giấy phép
 
-Phát hành theo giấy phép nguồn mở [MIT License](LICENSE).
+[MIT License](LICENSE).
 
 ---
 
 ## English Summary
 
-**mk-studio** is a collection of production-grade content and review skills for AI coding agents (Claude Code, omp, Codex, etc.). Its technical engineering counterpart is **[mk-lab](https://github.com/mzavn/mk-lab)**.
+**mk-studio** is a set of content, video and personal-knowledge skills for AI coding agents (Claude Code, omp, Codex and any Agent Skills reader). Its engineering counterpart is **[mk-lab](https://github.com/mzavn/mk-lab)**.
 
-- **`/mk:star` (STAR Journaling Coach):** Guides users through five structured reflective journaling frameworks (Daily Diary, Problem Solving A–Z, Packing Value, Creating Future, Mentoring), backed by a 28-case practice repository, automated milestone metrics (`progress.py`), and privacy-first local storage in `~/nhat-ky-star/`.
-- **`/mk:exec-review` (C-Suite Editorial Review):** Deploys an isolated read-only subagent acting as an executive board (CEO, CFO, CMO, COO, CTO) to critique Vietnamese Markdown articles through real customer personas. Audits AI-generated writing tells, standardizes specialized/coined terminology, optimizes for SEO/AEO/GEO, and enforces strict mechanical verification (`check_report.py`) before applying user-approved edits while preserving authentic author voice.
-- **`/mk:subtitle` (Subtitles for Video Editing):** Takes an existing SRT/VTT file (including YouTube auto-captions with per-word timing), flags filler sounds and stutters for user approval, removes approved ones and exports an exact cut list, re-splits lines to subtitle standards sized for horizontal or vertical video (Vietnamese-aware line breaks), fixes Vietnamese speech-recognition errors and terminology, translates to English on the same timings, and re-times subtitles for the cut timeline — all as `.srt` files that CapCut, Premiere Pro, DaVinci Resolve and Final Cut Pro import. Optionally burns subtitles into the finished video inside each platform's safe zone without covering the speaker's face (preview images for approval; needs ffmpeg with libass).
+- **`/mk:star`** — STAR journaling coach: five reflective frameworks, a 28-case practice bank, milestone tracking (`progress.py`), local-only storage in `~/nhat-ky-star/`.
+- **`/mk:exec-review`** — a read-only C-suite panel critiques Vietnamese Markdown articles through real customer personas: AI-writing tells, terminology, SEO/AEO/GEO; mechanical report checks; edits only the codes the author approves.
+- **`/mk:subtitle`** — subtitles and lecture production: YouTube captions or course-standard video download (`fetch-video`, compared against a reference), filler/stutter removal with approval, Vietnamese clean-up, English translation, line breaks sized for horizontal or vertical video (CapCut-ready SRT), splitting 2–4 h lectures into 20–30 min parts with an Editor Action Sheet and course-format Markdown, one naming template for every output, whole-file loudness probing, verified lossless cuts, scripted-video final cuts, optional subtitle burn-in inside platform safe zones.
+- **`/mk:video-cutter`** — clips from an Action Sheet with clean frames (Zoom bars and black borders removed), 16:9/9:16/custom output, one-step upscale, light enhancement, whole-file audio probe with copy/balance/master modes, ffprobe acceptance.
+- **`/mk:thumbnail`** — one template for a whole lecture series, offline: badge and title from file names, the user's AI backgrounds generated from a prompt file the skill writes (no image API, no keys) or a built-in bagua background, cut-out or circle-cropped portrait, logo; 1280×720 JPG under 2 MB, optional 1080×1920; needs ffmpeg with libass.
+- **`/mk:kaizen`** — project rules in `KAIZEN.md` (corrections, standing requirements, decisions), written only after the user approves each code; every mk skill reads them and lets them override its defaults, never its safety policy; rules recurring across projects become candidates for the skill itself.
 
-Install via `bash install.sh --global --skill <name>`. All skills adhere to strict local isolation, symlink protection, release tag verification, and data safety constraints. Licensed under MIT.
+Install with `bash install.sh --global --skill <name>`. Licensed under MIT.
