@@ -4,7 +4,7 @@ description: 'Make YouTube thumbnails for a whole series of lecture videos from 
 license: MIT
 metadata:
   author: mzavn
-  version: "0.1.0"
+  version: "0.9.0"
 ---
 
 # mk:thumbnail — Thumbnail YouTube theo khuôn cho cả chuỗi bài giảng

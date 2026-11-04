@@ -4,7 +4,7 @@ description: 'Subtitles, lecture splitting and scripted-video final cuts: fetch 
 license: MIT
 metadata:
   author: mzavn
-  version: "0.8.0"
+  version: "0.9.0"
 ---
 
 # mk:subtitle — Phụ đề & chia file con cho khâu dựng video

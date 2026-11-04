@@ -4,7 +4,7 @@ description: 'Keep a project-level KAIZEN.md of standing rules learned while usi
 license: MIT
 metadata:
   author: mzavn
-  version: "0.1.0"
+  version: "0.9.0"
 ---
 
 # mk:kaizen — Luật riêng của dự án cho các skill mk
