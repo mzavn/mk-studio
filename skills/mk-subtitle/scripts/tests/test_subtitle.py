@@ -96,7 +96,7 @@ class YouTubeInput(Base):
         rows = self.fillers(self.path("in.vtt", YOUTUBE))
         self.assertEqual(rows["à?@00:00:07,200"]["nhom"], "B")       # Thế à? — tiểu từ hỏi
         self.assertEqual(rows["Ừ,@00:00:07,800"]["nhom"], "B")       # Ừ, đúng rồi. — câu đáp
-        self.assertEqual(rows["mình@00:00:10,300"]["nhom"], "B")     # lặp từ
+        self.assertEqual(rows["mình@00:00:10,300"]["nhom"], "A")     # lặp trong cụm (vấp) → đề xuất cắt
         self.assertEqual(rows["kiểu@00:00:10,600"]["nhom"], "B")     # cụm người dùng thêm
         self.assertEqual(rows["như@00:00:10,800"]["nhom"], "B")
         self.assertEqual(rows["ừm@00:00:11,000"]["nhom"], "A")
@@ -106,15 +106,16 @@ class YouTubeInput(Base):
         self.fillers(src)
         out = self.ok("clean", src, "--fillers", self.path("f.tsv"), "--approve", "A", "--out-srt",
                       self.path("vi.srt"), "--out-cuts", self.path("cuts"))
-        self.assertIn("Đã bỏ 2 từ", out)
+        self.assertIn("Đã bỏ 3 từ", out)  # 2 âm đệm + 1 lặp trong cụm (vấp)
         vi = self.read("vi.srt")
         self.assertIn("Chào. Quán mình bán trà sữa.", vi)   # cue "Chào." quá ngắn → ghép với cue sau
         self.assertIn("2\n00:00:07,000 --> 00:00:09,000\n- Thế à?\n- Ừ, đúng rồi.\n", vi)  # >> đổi người nói → hội thoại
-        self.assertIn("Mình mình kiểu như mở thêm.", vi)
+        self.assertIn("Mình kiểu như mở thêm.", vi)
         with open(self.path("cuts.csv"), encoding="utf-8") as fh:
             cuts = list(csv.DictReader(fh))
         self.assertEqual([(c["bat_dau"], c["ket_thuc"], c["do_chinh_xac"]) for c in cuts],
-                         [("00:00:02,700", "00:00:03,000", "chính xác"), ("00:00:11,000", "00:00:11,400", "chính xác")])
+                         [("00:00:02,700", "00:00:03,000", "chính xác"), ("00:00:10,300", "00:00:10,600", "chính xác"),
+                          ("00:00:11,000", "00:00:11,400", "chính xác")])
         self.assertIn("✂", self.read("cuts.srt"))
 
     def test_retime_moves_later_cues_back_by_the_cut_time(self):
@@ -263,6 +264,55 @@ class GroupRules(Base):
             "Chiều nay họp đúng không Nhi? Ừ đúng rồi. Minh à xem lại giúp chị nhé quán mình ờ đông khách".split())))
         groups = {r["tu"]: r["nhom"] for r in rows.values()}
         self.assertEqual(groups, {"Ừ": "B", "à": "B", "ờ": "A"})
+
+    def groups(self, sentence):
+        rows = self.fillers(self.path("g%d.vtt" % len(os.listdir(self.d)), youtube(sentence.split())))
+        return [(r["tu"], r["nhom"], r["ly_do"]) for r in sorted(rows.values(), key=lambda r: int(r["vi_tri"]))]
+
+    def test_lap_qua_dau_cau_la_giu(self):
+        got = self.groups("Quán mở cửa lúc bảy giờ. Giờ đó khách đông lắm")
+        self.assertEqual([(t, g) for t, g, _ in got], [("Giờ", "G")])
+        self.assertIn("dấu câu", got[0][2])
+
+    def test_tu_lay_va_nhan_manh_la_giu(self):
+        got = self.groups("khách đến dần dần đông lên trà rất rất ngon")
+        self.assertEqual([(t, g) for t, g, _ in got], [("dần", "G"), ("rất", "G")])
+        self.assertTrue(all("láy" in why for _, _, why in got))
+
+    def test_lap_trong_cum_la_de_xuat_cat(self):
+        got = self.groups("chị gửi gửi file cho em nhé")
+        self.assertEqual([(t, g) for t, g, _ in got], [("gửi", "A")])
+        self.assertIn("vấp", got[0][2])
+
+    def test_sau_tu_xung_ho_la_can_nghe_lai(self):
+        got = self.groups("Alo mẹ à mẹ nghe con nói này. Các em à hôm nay nghỉ sớm")
+        self.assertEqual([(t, g) for t, g, _ in got], [("à", "B"), ("à", "B")])
+        self.assertTrue(all("xưng hô" in why for _, _, why in got))
+
+    def test_tieu_tu_liet_ke_la_giu(self):
+        got = self.groups("rồi thì tiền ư danh ư cũng qua hết")
+        self.assertEqual([(t, g) for t, g, _ in got], [("ư", "G"), ("ư", "G")])
+        self.assertTrue(all("liệt kê" in why for _, _, why in got))
+
+    def test_duyet_all_va_A_khong_lay_nhom_giu_chi_ma_rieng(self):
+        src = self.path("d.vtt", youtube("chị gửi gửi file. File này ờ quan trọng".split()))
+        self.ok("fillers", src, "--out", self.path("f.tsv"))
+        with open(self.path("f.tsv"), encoding="utf-8") as fh:
+            rows = list(csv.DictReader(fh, delimiter="\t"))
+        self.assertEqual([(r["tu"], r["nhom"]) for r in rows], [("gửi", "A"), ("File", "G"), ("ờ", "A")])
+        for spec, n in (("all", 2), ("A", 2), ("F002", 1), ("G", 1)):
+            res = run("clean", src, "--fillers", self.path("f.tsv"), "--approve", spec,
+                      "--out-srt", self.path("o-%s.srt" % spec), "--out-cuts", self.path("c-%s" % spec))
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertIn("Đã bỏ %d từ" % n, res.stdout)
+
+    def test_scan_va_fillers_in_so_nhom_giu(self):
+        src = self.path("s.vtt", youtube("chị gửi gửi file. File này ờ quan trọng".split()))
+        out = self.ok("scan", src)
+        self.assertIn("Nhóm A (đề xuất cắt", out)
+        self.assertIn("Giữ (không đề xuất cắt): 1", out)
+        out = self.ok("fillers", src, "--out", self.path("f2.tsv"))
+        self.assertIn("A 2 · B 0 · giữ 1", out)
 
 
 class Glossary(Base):

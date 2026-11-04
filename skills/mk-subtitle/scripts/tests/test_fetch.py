@@ -19,6 +19,8 @@ FAKE = r'''#!/usr/bin/env python3
 import json, os, sys
 sc = json.loads(os.environ.get("FAKE_YT", "{}"))
 a = sys.argv[1:]
+if "--help" in a:  # dò tuỳ chọn, không ghi log
+    print("  --ignore-config\n" + ("  --no-plugin-dirs\n" if sc.get("plugin_dirs") else "")); sys.exit(0)
 with open(os.environ["FAKE_LOG"], "a") as fh:
     fh.write(json.dumps(a) + "\n")
 if sc.get("error"):
@@ -146,6 +148,19 @@ class TestFetch(Base):
         res = self.run_fetch({}, path=os.path.join(self.d, "trong"))
         self.assertEqual(res.returncode, 1)
         self.assertIn("brew install yt-dlp", res.stderr)
+
+    def test_bo_qua_config_va_plugin_cuc_bo(self):
+        res = self.run_fetch({"auto": ["vi-orig"]})
+        self.assertEqual(res.returncode, 0, res.stderr)
+        for call in self.calls():
+            self.assertEqual(call[0], "--ignore-config")
+            self.assertNotIn("--no-plugin-dirs", call)  # bản yt-dlp này không có tuỳ chọn đó
+        os.remove(self.log)
+        shutil.rmtree(self.out)
+        res = self.run_fetch({"auto": ["vi-orig"], "plugin_dirs": True})
+        self.assertEqual(res.returncode, 0, res.stderr)
+        for call in self.calls():
+            self.assertEqual(call[:2], ["--ignore-config", "--no-plugin-dirs"])
 
 
 class TestVideoFile(Base):

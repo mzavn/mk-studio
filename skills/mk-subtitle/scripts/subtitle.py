@@ -2,6 +2,8 @@
 """Xử lý phụ đề SRT/VTT cho khâu dựng video (chỉ thư viện chuẩn, đầu ra tất định, không sửa file đầu vào).
 
   subtitle.py fetch URL --out-dir DIR [--lang vi] [--kind any|manual|auto] [--name TÊN] [--cookies-from-browser chrome]
+  subtitle.py fetch-video URL --out FILE.mp4 [--format "136+140/…"] [--player-client web_embedded,default,-android_vr]
+                          [--ref VIDEO_MẪU.mp4] [--cookies-from-browser chrome]
   subtitle.py scan IN [--glossary FILE]... [--fix "sai=chuẩn"]... [--more "từ"]...
   subtitle.py fillers IN --out FILLERS.tsv [--more "từ"]...
   subtitle.py clean IN --fillers FILLERS.tsv --approve "A,F012,F020-F025" [--reject "F007"]
@@ -15,13 +17,18 @@
 Đầu vào: SRT; VTT thường; VTT tự động của YouTube (có mốc thời gian từng từ — cắt chính xác, chia lại câu).
 fetch: tải phụ đề có sẵn của video YouTube bằng yt-dlp (không tải video) → DIR/<tên>.<lang>.vtt; ưu tiên phụ đề chủ kênh
 tải lên, không có thì phụ đề tự động (bản gốc "<lang>-orig", có mốc từng từ). Chỉ nhận link YouTube.
-Nhóm từ đệm: A = âm đệm giữa câu (à, ừ, ờ, ừm…) — đề xuất xoá; B = cần nghe lại (đầu/cuối câu, câu hỏi, lặp từ,
-từ người dùng thêm bằng --more). Lỗi đầu vào/lệnh sai → in "Lỗi: …", thoát 1, không ghi file nào.
+fetch-video: tải video YouTube theo chuẩn khoá (mặc định 720p30 H.264 + AAC) → FILE.mp4 không ghi đè; --ref → so
+độ phân giải, khung/giây, codec với video mẫu, lệch → dòng "LỆCH:", thoát 1 (file đã tải vẫn giữ).
+Nhóm từ đệm: A = đề xuất cắt (âm đệm à, ừ, ờ, ừm… giữa câu; lặp từ trong cụm, không qua dấu câu); B = cần nghe lại
+(đầu/cuối câu, câu hỏi, sau tên riêng hay từ xưng hô, từ người dùng thêm bằng --more); G = giữ, không đề xuất (lặp qua
+dấu câu, từ láy/nhấn mạnh, tiểu từ liệt kê). "all" = A + B; G chỉ bỏ khi duyệt "G" hoặc mã riêng.
+Lỗi đầu vào/lệnh sai → in "Lỗi: …", thoát 1, không ghi file nào.
 """
 import argparse
 import csv
 import hashlib
 import html
+import json
 import os
 import re
 import shutil
@@ -221,20 +228,36 @@ def context(words, i, width=4):
     return ("%s [%s] %s" % (left, words[i].text, right)).strip()
 
 
+ADDRESS = {"bố", "mẹ", "ba", "má", "anh", "chị", "em", "chú", "bác", "cô", "dì", "cậu", "mợ", "thím", "ông", "bà",
+           "con", "cháu", "thầy", "bạn"}
+REDUP = {"vân", "lâu", "song", "thao", "dần", "từ", "luôn", "ngày", "đâu", "mãi", "đời", "này", "đây", "rất",
+         "người", "nhà", "đêm"}  # từ láy / nhấn mạnh hay gặp: "dần dần", "rất rất"
+REPEAT_END = (".", ",", "?", "!", ";", ":", "…")
+
+
 def find_fillers(words, more=()):
-    """→ [(nhóm, lý do, chỉ số từ)] theo thứ tự thời gian."""
+    """→ [(nhóm, lý do, chỉ số từ)] theo thứ tự thời gian. Nhóm: A đề xuất cắt · B cần nghe lại · G giữ (máy chắc là
+    có nghĩa, không đề xuất)."""
     phrases = [m.lower().split() for m in more if m.strip()]
     hits, taken = [], set()
     for i, w in enumerate(words):
         n = norm(w.text)
         prev = words[i - 1] if i else None
-        nxt = words[i + 1] if i + 1 < len(words) else None
         sent_start = prev is None or prev.text.endswith(SENT_END) or prev.cue != w.cue and not w.timed
         if n in HARD:
+            def particle(k, away):  # words[k] cùng tiểu từ, không dính âm đệm khác (loại "à à với à")
+                inside = [k + away] if 0 <= k + away < len(words) else []
+                return 0 <= k < len(words) and norm(words[k].text) == n and not any(
+                    norm(words[j].text) in HARD for j in inside + [(i + k) // 2])
+            near = [n] if particle(i - 2, -1) or particle(i + 2, 1) else []
             if w.text.endswith("?") or (prev and norm(prev.text) in QUESTION_BEFORE and n in ("à", "ư")):
                 hits.append(("B", "có thể là tiểu từ hỏi (thế à?, vậy ư?)", i))
             elif sent_start:
                 hits.append(("B", "đầu câu hoặc ngay sau câu hỏi, có thể là câu đáp/cảm thán (Ừ đúng rồi, À thế thì)", i))
+            elif n in ("à", "ư") and n in near:
+                hits.append(("G", "giữ: tiểu từ liệt kê (tiền ư danh ư)", i))
+            elif n in ("à", "ư", "ơi", "ơ") and norm(prev.text) in ADDRESS:
+                hits.append(("B", "sau từ xưng hô, có thể là tiếng gọi hoặc âm đệm (mẹ à, em à)", i))
             elif n in ("à", "ơi", "ơ") and prev.text[:1].isupper():
                 hits.append(("B", "sau tên riêng, có thể là tiếng gọi (Minh à)", i))
             elif w.text.endswith(SENT_END):
@@ -244,7 +267,12 @@ def find_fillers(words, more=()):
             taken.add(i)
             continue
         if prev and n and not n.isdigit() and n == norm(prev.text) and i not in taken:
-            hits.append(("B", "lặp từ liền nhau (có thể là từ láy, vd dần dần)", i))
+            if n in REDUP:
+                hits.append(("G", "giữ: từ láy / nhấn mạnh (dần dần, rất rất)", i))
+            elif prev.text.endswith(REPEAT_END):
+                hits.append(("G", "giữ: lặp qua dấu câu — bắt đầu câu/cụm mới", i))
+            else:
+                hits.append(("A", "lặp từ trong cụm (vấp)", i))
             taken.add(i)
             continue
         for p in phrases:
@@ -319,8 +347,8 @@ def pick(rows, approve, reject):
                 continue
             up = tok.upper()
             if up == "ALL":
-                out |= codes
-            elif up in ("A", "B"):
+                out |= {r["ma"] for r in rows if r["nhom"] in ("A", "B")}  # nhóm G (giữ) chỉ bỏ khi duyệt rõ
+            elif up in ("A", "B", "G"):
                 out |= {r["ma"] for r in rows if r["nhom"] == up}
             elif re.fullmatch(r"F\d+-F?\d+", up):
                 a, b = (int(x) for x in re.findall(r"\d+", up))
@@ -330,7 +358,7 @@ def pick(rows, approve, reject):
                     die("không có mã %s trong file từ đệm" % tok)
                 out.add("F%03d" % int(up[1:]))
             else:
-                die("không hiểu '%s' — dùng A, B, all, F012 hoặc F020-F025" % tok)
+                die("không hiểu '%s' — dùng A, B, G, all, F012 hoặc F020-F025" % tok)
         return out
 
     return expand(approve) - expand(reject or "")
@@ -582,19 +610,21 @@ def cmd_scan(args):
     hits = find_fillers(words, args.more)
     a = [h for h in hits if h[0] == "A"]
     b = [h for h in hits if h[0] == "B"]
+    g = [h for h in hits if h[0] == "G"]
     print("\n== Từ đệm")
-    print("Nhóm A (âm đệm giữa câu, đề xuất xoá): %d" % len(a))
+    print("Nhóm A (đề xuất cắt: âm đệm giữa câu, lặp từ trong cụm): %d" % len(a))
     counts = {}
     for _, _, i in a:
         counts[norm(words[i].text)] = counts.get(norm(words[i].text), 0) + 1
     if counts:
         print("  " + ", ".join("%s %d" % kv for kv in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))))
-    print("Nhóm B (cần nghe lại): %d" % len(b))
-    reasons = {}
-    for _, why, _ in b:
-        reasons[why] = reasons.get(why, 0) + 1
-    for why, n in sorted(reasons.items(), key=lambda kv: (-kv[1], kv[0])):
-        print("  %s: %d" % (why, n))
+    for name, group in (("Nhóm B (cần nghe lại)", b), ("Giữ (không đề xuất cắt)", g)):
+        print("%s: %d" % (name, len(group)))
+        reasons = {}
+        for _, why, _ in group:
+            reasons[why] = reasons.get(why, 0) + 1
+        for why, n in sorted(reasons.items(), key=lambda kv: (-kv[1], kv[0])):
+            print("  %s: %d" % (why, n))
     fixes = []
     for g in args.glossary:
         fixes += parse_glossary(g)
@@ -649,8 +679,9 @@ def cmd_fillers(args):
     _, words, _ = load(args.input)
     hits = find_fillers(words, args.more)
     write_fillers(args.out, words, hits)
-    print("%d từ đệm (A %d · B %d) → %s" % (len(hits), sum(h[0] == "A" for h in hits),
-                                            sum(h[0] == "B" for h in hits), args.out))
+    print("%d từ đệm (A %d · B %d · giữ %d) → %s" % (len(hits), sum(h[0] == "A" for h in hits),
+                                                     sum(h[0] == "B" for h in hits), sum(h[0] == "G" for h in hits),
+                                                     args.out))
 
 
 def cmd_clean(args):
@@ -852,7 +883,7 @@ BROWSERS = ["brave", "chrome", "chromium", "edge", "firefox", "opera", "safari",
 VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
 
 
-def youtube_video(url):
+def youtube_video(url, cmd="fetch"):
     """Link YouTube → (mã video, link chuẩn watch?v=). Chỉ nhận link trỏ tới đúng một video; tự thêm https:// khi thiếu."""
     u = url.strip()
     if not re.match(r"(?i)https?://", u):
@@ -860,7 +891,7 @@ def youtube_video(url):
     p = urllib.parse.urlsplit(u)
     host = (p.hostname or "").lower()
     if host not in YT_HOSTS:
-        die("fetch chỉ nhận link YouTube (https://www.youtube.com/… hoặc https://youtu.be/…); nhận: %s" % url)
+        die("%s chỉ nhận link YouTube (https://www.youtube.com/… hoặc https://youtu.be/…); nhận: %s" % (cmd, url))
     if host == "youtu.be":
         vid = p.path.strip("/").split("/")[0]
     elif p.path == "/watch":
@@ -869,14 +900,28 @@ def youtube_video(url):
         m = re.match(r"^/(?:shorts|live|embed)/([^/]+)", p.path)
         vid = m.group(1) if m else ""
     if not VIDEO_ID.fullmatch(vid):
-        die("link phải trỏ tới một video cụ thể (watch?v=…, youtu.be/…, /shorts/…, /live/…); link playlist, kênh không "
-            "nhận: %s" % url)
+        die("%s: link phải trỏ tới một video cụ thể (watch?v=…, youtu.be/…, /shorts/…, /live/…); link playlist, kênh "
+            "không nhận: %s" % (cmd, url))
     return vid, "https://www.youtube.com/watch?v=" + vid
+
+
+_YTDLP_BASE = []
+
+
+def ytdlp_base():
+    """Đầu lệnh yt-dlp: bỏ qua mọi file config (yt-dlp.conf ở thư mục hiện tại/nhà có thể chứa --exec, cookies) và,
+    khi bản cài có tuỳ chọn này, bỏ qua thư mục plugin cục bộ."""
+    if not _YTDLP_BASE:
+        res = subprocess.run(["yt-dlp", "--ignore-config", "--help"], capture_output=True, text=True,
+                             encoding="utf-8", errors="replace")
+        _YTDLP_BASE.extend(["yt-dlp", "--ignore-config"] + (["--no-plugin-dirs"] if "--no-plugin-dirs" in res.stdout
+                                                             else []))
+    return list(_YTDLP_BASE)
 
 
 def ytdlp(args, url, cookies):
     """Chạy yt-dlp (không tải video). Lỗi → dừng, gợi ý cookies khi video cần đăng nhập. → stdout."""
-    cmd = ["yt-dlp", "--encoding", "utf-8", "--skip-download", "--no-playlist"] + args
+    cmd = ytdlp_base() + ["--encoding", "utf-8", "--skip-download", "--no-playlist"] + args
     if cookies:
         cmd += ["--cookies-from-browser", cookies]
     res = subprocess.run(cmd + ["--", url], capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -894,8 +939,8 @@ def cmd_fetch(args):
     lang = args.lang
     if not re.fullmatch(r"[a-z]{2,3}(-[A-Za-z]{2,4})?", lang):
         die("--lang cần mã ngôn ngữ như vi, en, zh-Hans; nhận: %s" % lang)
-    if args.name and (os.sep in args.name or args.name.startswith(".")):
-        die("--name là tên file, không chứa '/' và không bắt đầu bằng '.'")
+    if args.name and (os.sep in args.name or (os.altsep and os.altsep in args.name) or args.name.startswith(".")):
+        die("--name là tên file, không chứa '/' hay '\\' và không bắt đầu bằng '.'")
     dest = os.path.join(args.out_dir, "%s.%s.vtt" % (args.name or vid, lang))
     refuse_overwrite(dest)  # trước mọi lần gọi mạng
     if not shutil.which("yt-dlp"):
@@ -951,6 +996,111 @@ def cmd_fetch(args):
     print("→ %s" % dest)
 
 
+VIDEO_FORMAT = "136+140/bv*[height=720][vcodec^=avc1]+ba[ext=m4a]"  # 720p30 H.264 + AAC, có dự phòng
+PLAYER_CLIENT = "web_embedded,default,-android_vr"  # client android_vr hay bị 403 và chỉ có 720p60
+
+
+def ffprobe_video(path):
+    """→ dict(size, fps, vcodec, acodec, duration) của file video; không đọc được → dừng."""
+    res = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                          "stream=codec_type,codec_name,width,height,avg_frame_rate:format=duration", "-of", "json",
+                          os.path.abspath(path)], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    try:
+        data = json.loads(res.stdout) if res.returncode == 0 else {}
+    except ValueError:
+        data = {}
+    streams = data.get("streams") or []
+    v = next((s for s in streams if s.get("codec_type") == "video"), None)
+    a = next((s for s in streams if s.get("codec_type") == "audio"), None)
+    if not v:
+        die("ffprobe không đọc được luồng hình của %s" % path)
+    num, _, den = (v.get("avg_frame_rate") or "0/1").partition("/")
+    try:
+        fps = float(num) / float(den or 1)
+    except (ValueError, ZeroDivisionError):
+        fps = 0.0
+    try:
+        secs = int(float((data.get("format") or {}).get("duration") or 0))
+    except ValueError:
+        secs = 0
+    return {"size": "%s×%s" % (v.get("width"), v.get("height")), "fps": ("%.2f" % fps).rstrip("0").rstrip("."),
+            "vcodec": v.get("codec_name") or "?", "acodec": (a or {}).get("codec_name") or "không có tiếng",
+            "duration": "%d:%02d:%02d" % (secs // 3600, secs // 60 % 60, secs % 60)}
+
+
+def cmd_fetch_video(args):
+    vid, url = youtube_video(args.url, "fetch-video")
+    out = args.out
+    if not out.lower().endswith(".mp4"):
+        die("--out phải là file .mp4 (hình + tiếng được ghép thành mp4); nhận: %s" % out)
+    refuse_overwrite(out)  # trước mọi lần gọi mạng; lexists bắt cả symlink
+    if not re.fullmatch(r"[A-Za-z0-9_,-]+", args.player_client):
+        die("--player-client chỉ gồm tên client cách nhau bằng dấu phẩy (vd web_embedded,default,-android_vr)")
+    if not args.format.strip() or args.format.startswith("-"):
+        die("--format cần chuỗi định dạng yt-dlp, vd %s" % VIDEO_FORMAT)
+    for tool in ("yt-dlp", "ffmpeg", "ffprobe"):
+        if not shutil.which(tool):
+            die("cần %s trong PATH để tải và kiểm video — cài: brew install %s (macOS), winget install %s (Windows), "
+                "rồi chạy lại" % (tool, "yt-dlp" if tool == "yt-dlp" else "ffmpeg",
+                                  "yt-dlp.yt-dlp" if tool == "yt-dlp" else "Gyan.FFmpeg"))
+    ref = None
+    if args.ref:
+        if not os.path.isfile(args.ref):
+            die("không tìm thấy video mẫu --ref %s" % args.ref)
+        ref = ffprobe_video(args.ref)
+    out_dir = os.path.dirname(os.path.abspath(out))
+    os.makedirs(out_dir, exist_ok=True)
+    tmp = tempfile.mkdtemp(prefix=".mk-subtitle-video.", dir=out_dir)
+    try:
+        cmd = ytdlp_base() + ["--encoding", "utf-8", "--no-playlist", "--extractor-args",
+               "youtube:player_client=" + args.player_client, "-f", args.format, "--merge-output-format", "mp4",
+               "--no-overwrites", "-o", os.path.join(tmp, "video.%(ext)s")]
+        if args.cookies_from_browser:
+            cmd += ["--cookies-from-browser", args.cookies_from_browser]
+        res = subprocess.run(cmd + ["--", url], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if res.returncode != 0:
+            errs = [l for l in res.stderr.splitlines() if l.startswith("ERROR")]
+            err = errs[-1] if errs else res.stderr.strip()[-300:]
+            hint = ""
+            if "403" in err:
+                hint = " — YouTube chặn client này: thử --player-client khác (vd web_embedded hoặc web) hoặc cập nhật yt-dlp"
+            elif re.search(r"(?i)sign in|private|members|login|cookies", err):
+                hint = " — video riêng tư/cần đăng nhập: thêm --cookies-from-browser chrome (khi bạn đồng ý)"
+            elif re.search(r"(?i)requested format", err):
+                hint = " — video không có định dạng này: xem danh sách bằng yt-dlp -F rồi đổi --format"
+            die("yt-dlp không tải được video: %s%s" % (err, hint))
+        got = os.path.join(tmp, "video.mp4")
+        if not os.path.isfile(got):
+            die("yt-dlp không tạo ra file mp4 (cần ffmpeg để ghép hình + tiếng)")
+        try:
+            os.link(got, out)  # link không ghi đè: đích xuất hiện trong lúc tải → lỗi, không mất file
+        except FileExistsError:
+            die("%s đã có — chọn tên khác hoặc xoá file đó trước (skill không ghi đè)" % out)
+        except OSError:  # ổ không có hard link (exFAT, SMB): tạo mới 'xb' rồi chép — vẫn không ghi đè
+            try:
+                with open(got, "rb") as src, open(out, "xb") as dst:
+                    shutil.copyfileobj(src, dst)
+            except FileExistsError:
+                die("%s đã có — chọn tên khác hoặc xoá file đó trước (skill không ghi đè)" % out)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    info = ffprobe_video(out)
+    print("Video: %s · %s khung/giây · %s + %s · %s" % (info["size"], info["fps"], info["vcodec"], info["acodec"],
+                                                       info["duration"]))
+    print("→ %s" % out)
+    if ref:
+        diffs = [("độ phân giải", "size"), ("khung/giây", "fps"), ("codec hình", "vcodec"), ("codec tiếng", "acodec")]
+        bad = [(name, info[k], ref[k]) for name, k in diffs if info[k] != ref[k]]
+        for name, a, b in bad:
+            print("LỆCH: %s %s ≠ %s (video mẫu)" % (name, a, b))
+        if bad:
+            print("Kết quả: %d chỗ lệch so với %s — file đã tải vẫn giữ ở %s; báo người dùng trước khi cắt"
+                  % (len(bad), args.ref, out))
+            sys.exit(1)
+        print("Khớp video mẫu %s: %s · %s khung/giây · %s + %s" % (args.ref, ref["size"], ref["fps"], ref["vcodec"],
+                                                                  ref["acodec"]))
+
+
 def main(argv=None):
     utf8_stdio()
     ap = argparse.ArgumentParser(description="Xử lý phụ đề SRT/VTT cho khâu dựng video.")
@@ -969,6 +1119,15 @@ def main(argv=None):
     p.add_argument("--allow-translation", action="store_true",
                    help="video nói ngôn ngữ khác --lang: vẫn tải bản dịch chủ kênh tải lên (chỉ để dùng nguyên)")
     p.set_defaults(fn=cmd_fetch)
+
+    p = sub.add_parser("fetch-video")
+    p.add_argument("url")
+    p.add_argument("--out", required=True)
+    p.add_argument("--format", default=VIDEO_FORMAT)
+    p.add_argument("--player-client", default=PLAYER_CLIENT)
+    p.add_argument("--ref", help="video mẫu (vd buổi trước) để so độ phân giải, khung/giây, codec")
+    p.add_argument("--cookies-from-browser", choices=BROWSERS)
+    p.set_defaults(fn=cmd_fetch_video)
 
     p = sub.add_parser("scan")
     p.add_argument("input")

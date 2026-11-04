@@ -25,8 +25,9 @@ phút/chủ đề) cho đội ngũ dựng video (Editor) và làm tài liệu h�
    - *Tri thức cốt tủy:* Lời giảng nguyên lý, quy luật, giải mã của người hướng dẫn → **bảo toàn 100%**.
 2. **Trục an toàn dữ liệu (Data Integrity & Reversibility):**
    - File transcript gốc là Single Source of Truth, **không bao giờ sửa hoặc xóa dòng**.
-   - Mọi thao tác cắt gọt thực hiện qua **bảng lệnh CUT / KEEP** (Action Sheet). Trong file markdown, đoạn cắt đưa vào
-     callout thu gọn (`> [!CAUTION]-`) để khi cần kiểm tra chéo vẫn còn nguyên văn.
+   - Mọi thao tác cắt gọt thực hiện qua **bảng lệnh CUT / KEEP** (Action Sheet). Trong file markdown chuẩn khoá
+     (`split --style khoa`), đoạn cắt là khối `> [!WARNING] Lệnh Editor: CẮT BỎ (CUT)` kèm nguyên văn bên dưới (khung thô
+     `--style khung` thu gọn vào `> [!CAUTION]-`) để khi cần kiểm tra chéo vẫn còn nguyên văn.
 3. **Trục trải nghiệm người xem (Topic-First Architecture):**
    - Bài giảng dài 3–4 tiếng liên tục khiến người học ngợp và khó tra cứu.
    - Chuẩn vàng: **20–30 phút/file con** — vừa vặn một chu kỳ tập trung não bộ, dễ nghe podcast hoặc cắt clip ngắn.

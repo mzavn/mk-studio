@@ -22,9 +22,10 @@ S fetch "<link YouTube>" --out-dir <thư mục> [--name <tên>] [--lang vi] [--k
   [--cookies-from-browser chrome] [--allow-translation]
 ```
 
+- Script luôn gọi yt-dlp với `--ignore-config` (không đọc `yt-dlp.conf` cục bộ — file đó có thể chứa `--exec`, cookies) và `--no-plugin-dirs` khi bản cài hỗ trợ.
 - Cần `yt-dlp` trên máy; chưa có → script báo cách cài (`brew install yt-dlp` trên macOS, `winget install yt-dlp.yt-dlp` trên Windows, hoặc `pip install yt-dlp`). Hỏi người dùng trước khi cài.
 - `<thư mục>`: thư mục người dùng chỉ định, không nói thì thư mục làm việc hiện tại. `--name`: tên ngắn người dùng đặt; chưa có → chạy không `--name` (tên = mã video), dòng `Video:` in tiêu đề để đặt tên cho các bước sau.
-- Chỉ tải phụ đề, **không tải video**. Chỉ nhận link trỏ tới **một video** (`watch?v=`, `youtu.be/`, `/shorts/`, `/live/`; thiếu `https://` cũng được); link playlist, kênh bị từ chối. Từ chối ghi đè trước khi gọi mạng.
+- `fetch` chỉ tải phụ đề, **không tải video** (cần video nguồn để cắt file con → `S fetch-video`, `references/cat-video-va-am-thanh.md` §1). Chỉ nhận link trỏ tới **một video** (`watch?v=`, `youtu.be/`, `/shorts/`, `/live/`; thiếu `https://` cũng được); link playlist, kênh bị từ chối. Từ chối ghi đè trước khi gọi mạng.
 - `--kind any` (mặc định): lấy phụ đề **chủ kênh tải lên** nếu có; không có thì lấy phụ đề **tự động gốc** (`vi-orig`). `--kind auto`: buộc lấy bản tự động gốc (mốc từng từ) — dùng khi bản tải lên đã bị biên tập mà cần cắt từ đệm.
 - **Bản dịch:** script đọc ngôn ngữ nói của video (`Video: … · ngôn ngữ nói: en`). Khác `--lang` → dừng, vì phụ đề tiếng Việt khi đó là bản dịch: không làm luồng từ đệm, chuẩn hoá, tính lại giờ trên bản dịch. Muốn lời gốc → `--lang en` (dịch sang Việt là việc ngoài skill; skill chỉ dịch Việt → Anh). Chỉ cần bản dịch để dùng nguyên → `--allow-translation` (chỉ lấy bản chủ kênh tải lên; dòng `Nguồn` ghi `BẢN DỊCH`). Bản dịch hay có cue ghi tên người dịch ở đầu (`Translator: …`) — báo người dùng.
 - Phụ đề tự động chỉ nhận bản gốc `<lang>-orig`; bản `vi` tự động không kèm `-orig` là dịch máy → không dùng.
