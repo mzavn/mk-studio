@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cắt nhỏ video bài giảng dài theo Action Sheet: viền thừa, khung hình, độ phân giải, cân bằng âm thanh.
 
-  cutter.py probe VIDEO [--sample-time 00:15:00] [--duration 30]
+  cutter.py probe VIDEO [--sample-time 00:15:00 …] [--duration 30]   (đo cả file; mẫu chỉ để tham khảo)
   cutter.py frame VIDEO [--sheet SHEET [--prefix P] [--only P1,P3]] [--samples 12] [--preview DIR]
                         [--crop auto|none|W:H:X:Y] [--aspect 16:9|9:16|W:H|source] [--res auto|1080|source]
                         [--size WxH] [--fit pad|fill|blur] [--enhance]
@@ -226,76 +226,58 @@ def probe_metadata(video):
     return data
 
 
-def probe_audio(video, sample_time="00:15:00", duration=30):
+QUIET_LUFS = -24.0     # cả file nhỏ hơn mức này → master
+NEAR_LU = 1.0         # cách ngưỡng QUIET_LUFS trong ±1 LU → cảnh báo sát ngưỡng
+IMBALANCE_DB = 4.0     # lệch kênh từ mức này → balance
+SILENT_DB = -45.0      # mẫu có kênh to nhất dưới mức này → coi như im lặng, bỏ qua
+
+
+def channel_rms(stderr):
+    """Đọc dòng RMS từng kênh của astats (thứ tự Channel 1, 2…). -inf → float('-inf')."""
+    out = []
+    for block in re.split(r"Channel:\s*\d+", stderr.split("Overall")[0])[1:]:
+        m = re.search(r"RMS level dB:\s*(-?inf|[-\d.]+)", block, re.I)
+        if m:
+            out.append(float("-inf") if "inf" in m.group(1).lower() else float(m.group(1)))
+    return out
+
+
+def ffmpeg_audio(video, af, pre=()):
+    cmd = ["ffmpeg", "-hide_banner", "-nostats"] + list(pre) + ["-i", video, "-map", "0:a:0", "-vn", "-sn", "-dn",
+                                                                 "-af", af, "-f", "null", "-"]
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+
+def probe_audio(video, samples=(), duration=30):
+    """Đo cả file một lượt: độ to tích hợp (ebur128) + RMS từng kênh (astats, không reset). Mẫu (nếu có) chỉ để
+    tham khảo; mẫu gần im lặng bị bỏ qua. Khuyến nghị luôn dựa trên số đo cả file."""
     check_tools("ffmpeg")
-    cmd = [
-        "ffmpeg", "-hide_banner", "-ss", sample_time, "-t", str(duration),
-        "-i", video, "-af", "astats=metadata=1:reset=1", "-f", "null", "-"
-    ]
-    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    out = res.stderr
+    res = ffmpeg_audio(video, "ebur128=framelog=quiet,astats")
+    m = re.search(r"Integrated loudness:\s*I:\s*(-?[\d.]+|-?inf)\s*LUFS", res.stderr, re.S)
+    chans = channel_rms(res.stderr)
+    if res.returncode != 0 or not m or not chans:
+        die("không đọc được thông số âm thanh từ %s (file không có, không có luồng audio hoặc định dạng không hỗ trợ)"
+            % video)
+    lufs = float("-inf") if "inf" in m.group(1) else float(m.group(1))
+    delta, single_ear = 0.0, False
+    if len(chans) >= 2:
+        l, r = chans[0], chans[1]
+        single_ear = (l < -55.0 and r > -45.0) or (r < -55.0 and l > -45.0)
+        delta = float("inf") if single_ear and float("-inf") in (l, r) else abs(l - r)
+    imbalanced = single_ear or delta >= IMBALANCE_DB
+    quiet = lufs < QUIET_LUFS
+    mode = "master" if quiet else "balance" if imbalanced else "copy"
+    found = []
+    for t in samples:
+        sc = channel_rms(ffmpeg_audio(video, "astats", pre=["-ss", t, "-t", str(duration)]).stderr)
+        found.append((t, sc, bool(sc) and max(sc) < SILENT_DB))
+    return {"lufs": lufs, "chans": chans, "delta": delta, "single_ear": single_ear, "imbalanced": imbalanced,
+            "quiet": quiet, "near": abs(lufs - QUIET_LUFS) <= NEAR_LU, "mode": mode, "samples": found,
+            "duration": duration}
 
-    ch1_m = re.search(r"Channel:\s*1.*?RMS level dB:\s*([-\d.inf]+)", out, re.S | re.I)
-    ch2_m = re.search(r"Channel:\s*2.*?RMS level dB:\s*([-\d.inf]+)", out, re.S | re.I)
-    overall_m = re.search(r"Overall.*?RMS level dB:\s*([-\d.inf]+)", out, re.S | re.I)
 
-    # Nếu tua quá thời lượng video, thử lại từ 00:00:00
-    if not ch1_m and not overall_m and sample_time != "00:00:00":
-        sample_time = "00:00:00"
-        cmd = [
-            "ffmpeg", "-hide_banner", "-ss", sample_time, "-t", str(duration),
-            "-i", video, "-af", "astats=metadata=1:reset=1", "-f", "null", "-"
-        ]
-        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
-        out = res.stderr
-        ch1_m = re.search(r"Channel:\s*1.*?RMS level dB:\s*([-\d.inf]+)", out, re.S | re.I)
-        ch2_m = re.search(r"Channel:\s*2.*?RMS level dB:\s*([-\d.inf]+)", out, re.S | re.I)
-        overall_m = re.search(r"Overall.*?RMS level dB:\s*([-\d.inf]+)", out, re.S | re.I)
-
-    def parse_db(m):
-        if not m:
-            return None
-        val = m.group(1).strip()
-        if "inf" in val:
-            return float("-inf")
-        try:
-            return float(val)
-        except ValueError:
-            return None
-
-    ch1 = parse_db(ch1_m)
-    ch2 = parse_db(ch2_m)
-    overall = parse_db(overall_m)
-
-    if ch1 is None and overall is None:
-        die("không đọc được thông số âm thanh từ %s (file không có luồng audio hoặc định dạng không hỗ trợ)" % video)
-
-    if ch1 is not None and ch2 is not None:
-        delta = abs(ch1 - ch2)
-        avg = overall if overall is not None else (ch1 + ch2) / 2.0
-        single_ear = (ch1 < -55.0 and ch2 > -45.0) or (ch2 < -55.0 and ch1 > -45.0)
-        imbalanced = delta >= 4.0 or single_ear
-    else:
-        delta = 0.0
-        avg = overall if overall is not None else (ch1 if ch1 is not None else -30.0)
-        single_ear = False
-        imbalanced = False
-
-    is_quiet = avg < -24.0
-
-    if is_quiet:
-        rec_mode = "master"
-    elif imbalanced:
-        rec_mode = "balance"
-    else:
-        rec_mode = "copy"
-
-    return {
-        "sample_time": sample_time, "duration": duration,
-        "ch1": ch1, "ch2": ch2, "delta": delta, "overall": avg,
-        "single_ear": single_ear, "imbalanced": imbalanced, "quiet": is_quiet,
-        "mode": rec_mode
-    }
+def db(x):
+    return "-inf" if x == float("-inf") else "%.1f" % x
 
 
 # ---------------------------------------------------------------- Khung hình (viền thừa, tỉ lệ, độ phân giải)
@@ -712,7 +694,7 @@ def cmd_frame(args):
 
 def cmd_probe(args):
     meta = probe_metadata(args.video)
-    audio = probe_audio(args.video, args.sample_time, args.duration)
+    audio = probe_audio(args.video, args.sample_time or (), args.duration)
 
     v_stream = next((s for s in meta.get("streams", []) if s.get("codec_type") == "video"), None)
     a_stream = next((s for s in meta.get("streams", []) if s.get("codec_type") == "audio"), None)
@@ -725,36 +707,35 @@ def cmd_probe(args):
     if a_stream:
         print("Audio stream: %s" % a_stream.get("codec_name"))
 
-    print("\n--- Khảo sát âm thanh (mẫu: %s, %ds) ---" % (audio["sample_time"], audio["duration"]))
-    if audio["ch1"] is not None:
-        print("Kênh 1 (Trái): %.1f dB" % audio["ch1"])
-    if audio["ch2"] is not None:
-        print("Kênh 2 (Phải): %.1f dB" % audio["ch2"])
-        print("Độ lệch kênh (Δ): %.1f dB" % audio["delta"])
-    print("Độ lớn trung bình: %.1f dB" % audio["overall"])
-
-    status = []
-    if audio["single_ear"]:
-        status.append("Điếc 1 bên tai")
-    elif audio["imbalanced"]:
-        status.append("Lệch kênh (Δ ≥ 4 dB)")
-    elif audio["ch2"] is not None:
-        status.append("Cân bằng tốt (Δ ≤ 3 dB)")
-    else:
-        status.append("Mono (1 kênh)")
-
-    if audio["quiet"]:
-        status.append("Âm lượng nhỏ (RMS < -24 dB)")
-    else:
-        status.append("Âm lượng vừa vặn (RMS ≥ -24 dB)")
-    print("Tình trạng: %s" % " · ".join(status))
-
+    print("\n--- Khảo sát âm thanh: cả file (ebur128 + astats) ---")
+    print("Độ to tích hợp cả file: %s LUFS" % db(audio["lufs"]))
+    chans = audio["chans"]
+    names = ["trái", "phải"]
+    for i, v in enumerate(chans[:2]):
+        print("Kênh %d (%s, cả file): %s dB RMS" % (i + 1, names[i], db(v)))
+    if len(chans) >= 2:
+        print("Lệch kênh (Δ): %s dB" % ("∞" if audio["delta"] == float("inf") else "%.1f" % audio["delta"]))
+    for t, sc, silent in audio["samples"]:
+        vals = " · ".join("%s %s dB" % (names[i] if i < 2 else "kênh %d" % (i + 1), db(v)) for i, v in enumerate(sc))
+        tail = ("gần im lặng (< %d dB), bỏ qua" % SILENT_DB) if silent else (
+            "không đọc được, bỏ qua" if not sc else "chỉ để tham khảo")
+        print("Mẫu %s (%d giây): %s — %s" % (t, audio["duration"], vals or "-", tail))
+    parts = ["Điếc 1 bên tai" if audio["single_ear"] else
+             "Lệch kênh (Δ ≥ %d dB)" % IMBALANCE_DB if audio["imbalanced"] else
+             "Âm thanh 1 kênh (mono)" if len(chans) < 2 else "Cân bằng tốt (Δ < %d dB)" % IMBALANCE_DB,
+             "Âm lượng quá nhỏ (< %d LUFS)" % QUIET_LUFS if audio["quiet"] else "Âm lượng đủ (≥ %d LUFS)" % QUIET_LUFS]
+    print("Tình trạng: %s" % " · ".join(parts))
     desc = {
         "copy": "Mode 1 (copy) — Pure Stream Copy (không re-encode, tốc độ tối đa)",
         "balance": "Mode 2 (balance) — Cân bằng Dual-Mono (re-encode AAC 192k)",
         "master": "Mode 3 (master) — Dual-Mono + Loudnorm -16 LUFS (re-encode AAC 192k)"
     }
     print("Khuyến nghị: %s" % desc[audio["mode"]])
+    if audio["near"]:
+        print("Cảnh báo: cả file %s LUFS sát ngưỡng %d LUFS (±%d LU) — đối chiếu chế độ buổi trước trước khi chốt."
+              % (db(audio["lufs"]), QUIET_LUFS, NEAR_LU))
+    print("Giữ một chế độ cho cả khoá: buổi trước đã dùng chế độ khác → báo người dùng trước khi đổi, để các file con "
+          "nghe đều nhau.")
 
 
 def cmd_parse(args):
@@ -788,7 +769,8 @@ def cmd_cut(args):
         print("Khảo sát âm thanh trước khi cắt (Pre-flight probe)...")
         audio = probe_audio(args.video)
         mode = audio["mode"]
-        print("→ Tự động chọn chế độ: %s (RMS: %.1f dB, Δ: %.1f dB)" % (mode, audio["overall"], audio["delta"]))
+        print("→ Tự động chọn chế độ: %s (cả file %s LUFS, Δ %s dB)"
+              % (mode, db(audio["lufs"]), "∞" if audio["delta"] == float("inf") else "%.1f" % audio["delta"]))
 
     if not args.dry_run:
         try:
@@ -796,7 +778,7 @@ def cmd_cut(args):
         except OSError as exc:
             die("không tạo được thư mục đầu ra %s: %s" % (args.out_dir, exc))
 
-    is_mono = (audio.get("ch2") is None) if audio else False
+    is_mono = len(audio["chans"]) < 2 if audio else False
     pan_filter = "pan=stereo|c0=c0|c1=c0" if is_mono else "pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1"
     video_args = ["-vf", vf] + encoder_args(args) if vf else ["-c:v", "copy"]
     if mode == "balance":
@@ -917,8 +899,8 @@ def main(argv=None):
 
     p = sub.add_parser("probe")
     p.add_argument("video")
-    p.add_argument("--sample-time", default="00:15:00")
-    p.add_argument("--duration", type=int, default=30)
+    p.add_argument("--sample-time", action="append", help="mẫu tham khảo (lặp được); khuyến nghị luôn theo cả file")
+    p.add_argument("--duration", type=int, default=30, help="độ dài mỗi mẫu tham khảo, giây")
     p.set_defaults(fn=cmd_probe)
 
     p = sub.add_parser("frame", parents=[frame_opts])

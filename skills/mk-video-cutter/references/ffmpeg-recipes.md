@@ -46,7 +46,20 @@ Micro mono (cài áo, micro bàn) cắm vào cổng stereo 3.5mm thường chỉ
 
 ## 3. Chuẩn Hóa Âm Lượng Theo Tiêu Chuẩn Quốc Tế EBU R128
 
-Video ghi âm qua Zoom hoặc lớp học trực tuyến thường có âm lượng quá nhỏ ($\text{RMS} < -24\text{ dB}$). Người nghe phải mở volume 100% trên điện thoại/tai nghe vẫn khó nghe.
+Video ghi âm qua Zoom hoặc lớp học trực tuyến thường có âm lượng quá nhỏ (độ to tích hợp cả file $< -24\text{ LUFS}$). Người nghe phải mở volume 100% trên điện thoại/tai nghe vẫn khó nghe.
+
+### Bảng quyết định của `cutter.py probe` (đo cả file)
+Một lượt ffmpeg trên toàn bộ file: `-af ebur128=framelog=quiet,astats` (astats **không** `reset`: `reset=1` chỉ báo khung âm cuối, không phải cả đoạn). Không dựa vào một mẫu 30 giây: mẫu có thể rơi vào chỗ ngừng nói và khuyên nhầm `master`.
+
+| Số đo cả file | Chế độ |
+|---|---|
+| Độ to tích hợp $< -24$ LUFS | `master` |
+| Không nhỏ, nhưng Δ Trái/Phải $\ge 4$ dB hoặc một kênh chết (< −55 dB trong khi kênh kia > −45 dB) | `balance` |
+| Còn lại | `copy` |
+
+- Cả file trong ±1 LU quanh −24 LUFS → script in `Cảnh báo: … sát ngưỡng`; đối chiếu chế độ buổi trước rồi mới chốt.
+- `--sample-time` (lặp được) chỉ in số đo mẫu để tham khảo; mẫu có kênh to nhất < −45 dB bị coi là im lặng và bỏ qua.
+- Giữ **một chế độ cho cả khoá** để các file con nghe đều nhau; muốn đổi giữa khoá → hỏi người dùng.
 
 ### Bộ lọc `loudnorm`
 Chuẩn hóa độ lớn tích hợp (Integrated Loudness) theo chuẩn phát thanh YouTube/Podcast:

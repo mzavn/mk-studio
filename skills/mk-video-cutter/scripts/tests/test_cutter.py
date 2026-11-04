@@ -72,7 +72,7 @@ class Base(unittest.TestCase):
         self.assertEqual(res.returncode, 0, "STDERR: %s\nSTDOUT: %s" % (res.stderr, res.stdout))
         return res.stdout
 
-    def fail(self, *args):
+    def fails(self, *args):  # không đặt tên `fail`: sẽ che TestCase.fail và nuốt mọi assert hỏng
         res = run(*args)
         self.assertNotEqual(res.returncode, 0, "Lẽ ra phải lỗi nhưng thoát 0:\n" + res.stdout)
         return res.stdout + res.stderr
@@ -98,13 +98,13 @@ class TestParse(Base):
         self.assertIn("Buổi 1-P1 - Khởi Động.mp4", out)
 
     def test_parse_missing_file(self):
-        err = self.fail("parse", self.path("not_found.txt"))
+        err = self.fails("parse", self.path("not_found.txt"))
         self.assertIn("không đọc được", err)
 
 
 class TestProbe(Base):
     def test_probe_missing_file(self):
-        err = self.fail("probe", self.path("not_found.mp4"))
+        err = self.fails("probe", self.path("not_found.mp4"))
         self.assertIn("không đọc được thông số", err)
 
     def test_probe_synthetic(self):
@@ -119,6 +119,53 @@ class TestProbe(Base):
         out = self.ok("probe", vid, "--sample-time", "00:00:00", "--duration", "1")
         self.assertIn("# probe:", out)
         self.assertIn("Khuyến nghị:", out)
+
+    def tone(self, name, left, right, seconds):
+        """Âm thanh tổng hợp stereo 8 kHz: biểu thức ffmpeg cho từng kênh."""
+        if subprocess.run(["which", "ffmpeg"], capture_output=True).returncode != 0:
+            self.skipTest("cần ffmpeg")
+        out = self.path(name)
+        res = subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i",
+                              "aevalsrc=exprs=%s|%s:s=8000:d=%d" % (left, right, seconds),
+                              "-c:a", "pcm_s16le", out], capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        return out
+
+    def test_probe_silence_at_old_sample_is_copy(self):
+        # 16 phút tiếng to, im lặng đúng quanh 00:15:00 (mốc mẫu cũ) → đo cả file vẫn copy
+        loud = "0.3*sin(2*PI*440*t)*not(between(t\\,880\\,940))"
+        wav = self.tone("pause.wav", loud, loud, 960)
+        out = self.ok("probe", wav)
+        self.assertIn("Độ to tích hợp cả file:", out)
+        self.assertIn("Khuyến nghị: Mode 1 (copy)", out)
+        self.assertIn("Giữ một chế độ cho cả khoá", out)
+        out = self.ok("probe", wav, "--sample-time", "00:15:00", "--sample-time", "00:01:00")
+        self.assertIn("Mẫu 00:15:00 (30 giây):", out)
+        self.assertIn("gần im lặng (< -45 dB), bỏ qua", out)
+        self.assertIn("Mẫu 00:01:00 (30 giây):", out)
+        self.assertIn("chỉ để tham khảo", out)
+        self.assertIn("Khuyến nghị: Mode 1 (copy)", out)
+
+    def test_probe_one_channel_dead_is_balance(self):
+        wav = self.tone("left.wav", "0.3*sin(2*PI*440*t)", "0", 20)
+        out = self.ok("probe", wav)
+        self.assertIn("Điếc 1 bên tai", out)
+        self.assertIn("Lệch kênh (Δ): ∞ dB", out)
+        self.assertIn("Khuyến nghị: Mode 2 (balance)", out)
+
+    def test_probe_quiet_file_is_master(self):
+        quiet = "0.01*sin(2*PI*440*t)"
+        wav = self.tone("quiet.wav", quiet, quiet, 20)
+        out = self.ok("probe", wav)
+        self.assertIn("Âm lượng quá nhỏ (< -24 LUFS)", out)
+        self.assertIn("Khuyến nghị: Mode 3 (master)", out)
+
+    def test_probe_near_threshold_warns(self):
+        # sine 1 kHz biên độ 0.07, stereo → cả file ≈ −23.1 LUFS, trong ±1 LU quanh −24
+        near = "0.07*sin(2*PI*1000*t)"
+        wav = self.tone("near.wav", near, near, 20)
+        out = self.ok("probe", wav)
+        self.assertIn("sát ngưỡng", out)
 
 
 class TestCut(Base):
@@ -148,7 +195,7 @@ class TestCut(Base):
         self.assertTrue(os.path.exists(target_clip))
 
         # 3. Chống ghi đè
-        dup_err = self.fail("cut", vid, "--sheet", plan, "--prefix", "Buổi 1",
+        dup_err = self.fails("cut", vid, "--sheet", plan, "--prefix", "Buổi 1",
                             "--out-dir", out_dir, "--mode", "copy")
         self.assertIn("đã có — xoá file hoặc đổi thư mục (không ghi đè)", dup_err)
 
@@ -252,19 +299,19 @@ class TestFrame(Base):
         self.ok("frame", vid, "--aspect", "16:9", "--res", "360", "--preview", prev)
         self.assertEqual(dims(os.path.join(prev, "khung-dau-ra.png")), "640,360")
         self.assertTrue(os.path.getsize(os.path.join(prev, "khung-phat-hien.png")) > 0)
-        err = self.fail("frame", vid, "--preview", prev)
+        err = self.fails("frame", vid, "--preview", prev)
         self.assertIn("không ghi đè", err)
 
     def test_crop_ngoai_khung_bi_tu_choi(self):
         vid = self.path("zoom.mp4")
         make_video(vid, ZOOM_LIKE, seconds=6)
-        err = self.fail("frame", vid, "--crop", "400:260:10:0")
+        err = self.fails("frame", vid, "--crop", "400:260:10:0")
         self.assertIn("nằm ngoài khung", err)
 
     def test_only_ma_khong_co_bao_loi(self):
         vid = self.path("zoom.mp4")
         make_video(vid, ZOOM_LIKE, seconds=6)
-        err = self.fail("frame", vid, "--sheet", self.path("plan.txt", PLAN_12S), "--only", "P9")
+        err = self.fails("frame", vid, "--sheet", self.path("plan.txt", PLAN_12S), "--only", "P9")
         self.assertIn("không có đoạn KEEP mã P9", err)
 
     def test_bo_cuc_doi_chi_dung_doan_va_anh_co_ca_hai_bo_cuc(self):
@@ -283,7 +330,7 @@ class TestFrame(Base):
     def test_only_rong_bi_tu_choi(self):
         vid = self.path("zoom.mp4")
         make_video(vid, ZOOM_LIKE, seconds=6)
-        err = self.fail("frame", vid, "--sheet", self.path("plan.txt", PLAN_12S), "--only", ",")
+        err = self.fails("frame", vid, "--sheet", self.path("plan.txt", PLAN_12S), "--only", ",")
         self.assertIn("cần ít nhất một mã", err)
 
 
@@ -325,7 +372,7 @@ class TestCutFrame(Base):
     def test_verify_sai_khung_bao_loi(self):
         out_dir = self.path("out")
         self.ok("cut", self.vid, "--sheet", self.plan, "--prefix", "Buổi 9", "--out-dir", out_dir, "--mode", "copy")
-        out = self.fail("verify", out_dir, "--expect-size", "1920x1080")
+        out = self.fails("verify", out_dir, "--expect-size", "1920x1080")
         self.assertIn("LỖI: KHUNG 400x260 ≠ 1920x1080", out)
 
     def test_verify_doi_chieu_ten_co_prefix(self):
